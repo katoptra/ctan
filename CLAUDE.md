@@ -19,7 +19,7 @@ Everything is in a few files:
   happens inside it, locally and in Actions alike; `task run -- task <args>` runs any task
   in it with the repo at `/work`.
 - `.github/workflows/sync.yml`: `workflow_dispatch` alone, `timeout-minutes: 350`, inputs
-  `seed`, `reconcile`, `max_batches`. Nothing in this repo starts it:
+  `reconcile`, `max_batches`. Nothing in this repo starts it:
   [`jshvn/dispatch`](https://github.com/jshvn/dispatch), a Cloudflare Workflow, POSTs the
   dispatch hourly at :42. `check.yml`: `task --dry --force sync` on pull requests. Both call
   `task run --`, so the runner supplies nothing but `task` and a Docker daemon.
@@ -66,16 +66,18 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
   the signed tlpdb, deriving the revision-stamped name from the stanza's `revision`, and
   refuses a batch carrying an `archive/` path the tlpdb does not describe. A batch
   carrying no container skips that check whole: nothing to refuse, and no `RUN/tl`.
-- **A missing state file fails the run** unless `SEED=true` (empty bucket) or
-  `RECONCILE=true` (rebuild it from a bucket listing joined to upstream on size). Treating a
-  missing state as empty would re-upload 140 GB.
+- **The bucket is the mirror; the state is a cache of it.** A missing state file is
+  rebuilt from a bucket listing joined to upstream on size, never treated as empty, so
+  losing it costs one listing and not 140 GB. An empty bucket rebuilds to an empty state,
+  and the first run fills it `MAX_BATCHES` at a time, chaining runs while batches remain.
+  There is no seed flag.
 - **The decision batch is last.** tlnet's `tlpkg/` and the root files (`timestamp` last of
   all) go in the final batch, after every container, and `verify` refuses that batch unless
   every container the tlpdb names is in the bucket after this run. `delete` waits for the
   hour in which every batch has landed, so the live tlpdb never names a removed container.
-  `smoke` names `/timestamp` twice and asks for it only when the state records it: a seed
-  capped at `MAX_BATCHES` has not reached the decision batch, and the bucket answers 404 to a
-  key it has never held.
+  `smoke` names `/timestamp` twice and asks for it only when the state records it: a first
+  fill capped at `MAX_BATCHES` has not reached the decision batch, and the bucket answers 404
+  to a key it has never held.
 - **Never `aws s3 sync`.** `publish` is `aws s3 cp --recursive` (one PutObject per file,
   never a destination listing). Deletions come from `diff`, 1,000 keys per `DeleteObjects`,
   with the `Errors` array checked because the CLI exits 0 on it.
@@ -129,7 +131,7 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
   which absorbs a queued run plus a full one; healthchecks.io emails when the grace passes
   without `ping`. It watches the dispatcher too: nothing here starts a run, so a scheduler
   that stops firing and a pipeline that stops finishing are the same missing ping. Pause the
-  check before a seed — a multi-hour run outlasts the grace.
+  check before a first fill or a large backlog — a multi-hour run outlasts the grace.
 - The edge cache is off, by a zone rule, and the pipeline has no purge step. Caching saves
   nothing below 10M reads a month and a one-hour TTL saves nothing at any volume, because
   Cloudflare caches per datacentre; `docs/reference.md` sections 3 and 6 have the
@@ -165,7 +167,7 @@ dante listing and a signed `tlpkg/` tree.
   page check runs rather than being skipped; over `file://` only the INDEX key is read,
   because a filesystem cannot hold both `a/b` and `a/b/`.
 - `publish`, `checkpoint`, `delete`, `rebuild`, `index` need credentials; use a scratch
-  bucket: `task run -- task sync BUCKET=<scratch> SEED=true MAX_BATCHES=1 BATCH_GB=1`.
+  bucket: `task run -- task sync BUCKET=<scratch> MAX_BATCHES=1 BATCH_GB=1`.
 - Is the mirror fresh? `curl -s https://ctan.ijosh.com/timestamp`.
 
 Eight hazards, each of which has cost an evening:

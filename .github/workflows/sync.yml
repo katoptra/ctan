@@ -2,12 +2,8 @@ name: sync
 on:
   workflow_dispatch:
     inputs:
-      seed:
-        description: 'The bucket is empty and there is no state file: upload everything'
-        type: boolean
-        default: false
       reconcile:
-        description: 'List the bucket and rebuild the state this run (also bootstraps a missing state)'
+        description: 'List the bucket and rebuild the state this run (a missing state rebuilds on its own)'
         type: boolean
         default: false
       max_batches:
@@ -20,6 +16,7 @@ on:
   #   - cron: '42 * * * *'
 permissions:
   contents: read
+  actions: write   # chain: gh workflow run
 concurrency:
   group: sync
   cancel-in-progress: false   # one run at a time; a slot that fires during a run waits and starts the moment it ends
@@ -44,6 +41,14 @@ jobs:
       # nonzero is all the job needs.
       - run: >-
           task run -- task --color sync
-          SEED=${{ inputs.seed == true }}
           RECONCILE=${{ inputs.reconcile == true && 'true' || 'auto' }}
           MAX_BATCHES=${{ inputs.max_batches || '4' }}
+      - name: Chain the next run
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -f run/chain ]; then
+            gh workflow run sync.yml --ref "$GITHUB_REF_NAME"
+            echo "chained: batches remain, next run queued" >> "$GITHUB_STEP_SUMMARY"
+          fi

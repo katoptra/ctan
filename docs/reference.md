@@ -269,8 +269,8 @@ Nothing in this repo starts a run, so this check is also the only thing watching
 dispatcher: a scheduler that stops firing looks exactly like a pipeline that stopped
 finishing, and both are caught by the same missing ping.
 
-Nothing sends `/start`, so the grace does not cap run duration. Before a seed or a large
-backlog dispatch, pause the check in the UI — a multi-hour run would otherwise blow the
+Nothing sends `/start`, so the grace does not cap run duration. Before a first fill or a
+large backlog dispatch, pause the check in the UI — a multi-hour run would otherwise blow the
 grace. A paused check resumes on its next ping.
 
 The second surface is the run's own job page, where `report` appends the delta, upload,
@@ -299,13 +299,14 @@ The failed step names the class. The state's line count against the listing's sa
 behind the mirror is.
 
 **Re-run.** `gh workflow run sync.yml`, or `task sync`. Safe: the state is as of the last
-checkpoint and the run recomputes the rest. During a seed this is the resume.
+checkpoint and the run recomputes the rest. During a first fill this is the resume.
 
 **The run failed before the pipeline started.** A failure inside `task: [image] docker build`
 is the base image pull, not the mirror: Docker Hub was unreachable or throttling. Nothing was
 uploaded and no state moved, so re-running is the whole fix. Section 2 has the pull budget.
 
-**Rebuild the state** — a missing, corrupt or distrusted state file.
+**Rebuild the state** — a corrupt or distrusted state file. A missing one rebuilds on its
+own at the next run.
 
 ```sh
 gh workflow run sync.yml -f reconcile=true      # or: task sync RECONCILE=true
@@ -313,17 +314,14 @@ gh workflow run sync.yml -f reconcile=true      # or: task sync RECONCILE=true
 
 Lists the bucket and joins it to the upstream listing. Same-size objects are taken as
 current, so a same-size change that happened while the state was unusable is missed until
-upstream touches the file again. Safe: the rebuild uploads nothing.
+upstream touches the file again. Safe: the rebuild uploads nothing. The bucket is the
+mirror and the state is a cache of it; losing the state costs one listing, losing the
+bucket costs the fill below.
 
-**Seed on purpose.**
-
-```sh
-gh workflow run sync.yml -f seed=true -f max_batches=40
-```
-
-Deleting the state object does not start a seed; it fails every run, by design. Safe for
-correctness, not for the budget: the delta is the whole tree, about 511k Class A and 140 GB
-from dante. Pause the healthcheck first.
+**First fill.** There is no flag. An empty bucket rebuilds to an empty state, the delta is
+the whole tree, and each run works `max_batches` batches then queues the next run itself
+while batches remain. About 511k Class A and 140 GB from dante, over several chained
+runs. Pause the healthcheck first.
 
 **Delete one key.**
 
