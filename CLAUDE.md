@@ -29,13 +29,15 @@ Everything is in a few files:
 - `ghcr.io/katoptra/toolbox:rsync-v1`, built and pinned in lib: the toolbox image, and so
   the pipeline's environment. Every run happens inside it, locally and in Actions alike;
   `task run -- task <args>` runs any verb in it with the repo at `/work`.
-- `.github/workflows/sync.yml`: ten lines calling lib's reusable `sync.yml@v1`:
+- `.github/workflows/sync.yml`: ten lines calling lib's reusable `sync.yml`:
   `workflow_dispatch` alone, one input `vars` (`KEY=value` pairs for the pipeline),
   `timeout-minutes: 355`, `secrets: inherit`, `actions: write` for the chain. Nothing in
   this repo starts it: [`jshvn/dispatch`](https://github.com/jshvn/dispatch), a Cloudflare
-  Workflow, POSTs the dispatch hourly at :42. `check.yml` calls lib's `check.yml@v1` on
-  pull requests: `task check` inside the image. The runner supplies nothing but what lib's
-  action installs.
+  Workflow, POSTs the dispatch hourly at :42. `check.yml` calls lib's `check.yml` on
+  pull requests: `task check` inside the image. Both are pinned to lib's release commit
+  with the version in a trailing comment, because this repository's Actions policy
+  requires a full SHA on every `uses:`; Dependabot bumps them on a lib release. The
+  runner supplies nothing but what lib's action installs.
 
 `README.md` is for users and is the mirror's only documentation page; the root URL serves
 CTAN's own `index.html`. Operational detail belongs here and in Taskfile comments.

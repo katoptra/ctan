@@ -20,9 +20,10 @@ Pull requests are welcome, especially ones that make the pipeline smaller.
   `.state/` is the one reserved prefix.
 - The zone is configured by hand and the pipeline never calls the Cloudflare API. Section 6
   of `docs/reference.md` has the rules it wants.
-- The workflows call lib's at `v1`, a tag that moves with lib's releases; that is how a
-  change to the toolbox reaches every mirror. Inside lib every action is pinned to a full
-  commit SHA.
+- The workflows call lib's reusable ones pinned to a full commit SHA with the version in
+  a trailing comment, as this repository's Actions policy requires of every `uses:`;
+  Dependabot bumps them on a lib release. The include and the image float at `v1`, which
+  is how a change to a verb or a tool reaches every mirror.
 
 ## Checking a change
 
