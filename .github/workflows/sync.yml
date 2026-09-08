@@ -2,53 +2,16 @@ name: sync
 on:
   workflow_dispatch:
     inputs:
-      reconcile:
-        description: 'List the bucket and rebuild the state this run (a missing state rebuilds on its own)'
-        type: boolean
-        default: false
-      max_batches:
-        description: 'Batches to work this run (4 GB each; the rest wait for the next hour)'
+      vars:
+        description: 'KEY=value pairs for the pipeline, e.g. "RECONCILE=true MAX_BATCHES=8"'
         type: string
-        default: '4'
-  # To use GitHub Actions scheduling, uncomment the following lines and
-  # remove the `workflow_dispatch` section above. The cron syntax is UTC.
-  # schedule:
-  #   - cron: '42 * * * *'
+        default: ''
 permissions:
   contents: read
-  actions: write   # chain: gh workflow run
-concurrency:
-  group: sync
-  cancel-in-progress: false   # one run at a time; a slot that fires during a run waits and starts the moment it ends
+  actions: write   # the called workflow chains the next run; a called workflow cannot raise this
+concurrency: {group: sync, cancel-in-progress: false}
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 350   # under the 6-hour job limit; every batch checkpoints, so a cut-off costs one batch
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
-      # Builds the toolbox and prints the versions the run will use. df is the host's:
-      # the image and the batches share the runner's disk, and the batch budget is that disk.
-      - run: df -h . && task run -- sh -c 'aws --version && rsync --version | head -1'
-      # The pipeline runs inside the image, so its environment is docker/Dockerfile and not
-      # whatever ubuntu-latest ships this month. go-task reports 201 for any inner failure;
-      # nonzero is all the job needs.
-      - run: >-
-          task run -- task --color sync
-          RECONCILE=${{ inputs.reconcile == true && 'true' || 'auto' }}
-          MAX_BATCHES=${{ inputs.max_batches || '4' }}
-      - name: Chain the next run
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -f run/chain ]; then
-            gh workflow run sync.yml --ref "$GITHUB_REF_NAME"
-            echo "chained: batches remain, next run queued" >> "$GITHUB_STEP_SUMMARY"
-          fi
+    uses: katoptra/lib/.github/workflows/sync.yml@v1
+    with: {vars: '${{ inputs.vars }}', timeout-minutes: 355}
+    secrets: inherit

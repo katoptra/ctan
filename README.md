@@ -31,14 +31,17 @@ To go back to CTAN's mirror rotation: `tlmgr option repository ctan`.
 
 ## How it works
 
-On an hourly schedule this GitHub action is triggered and runs the following pipeline.
-Every step is a task in [`Taskfile.yml`](https://github.com/katoptra/ctan/blob/main/Taskfile.yml):
+On an hourly schedule this GitHub action is triggered and runs the following pipeline
+inside the toolbox image. Every step is a verb of the rsync engine in
+[katoptra/lib](https://github.com/katoptra/lib), in the order
+[`Taskfile.yml`](https://github.com/katoptra/ctan/blob/main/Taskfile.yml) gives them; the
+directory pages and the checks that read them back are this mirror's own verbs:
 
 1. **`clock` `list` `state` `rebuild`** — stamp the hour, list CTAN's master (dante), and
    fetch the listing the previous run left in the bucket, rebuilding it if it went missing.
-2. **`diff` `plan`** — take what upstream has and the state lacks, and split it into batches
+2. **`diff` `split`** — take what upstream has and the state lacks, and split it into batches
    of at most 4 GB. The mirror is never a local copy: the runner has 14 GB, the tree has 140.
-3. **`tlpdb` `batches`** — per batch, rsync the files, check the signed TeX Live control
+3. **`prepare` `batches`** — per batch, rsync the files, check the signed TeX Live control
    files against a pinned key fingerprint and every package container against the tlpdb's
    checksums, upload, and write the new state. A run that dies repeats one batch, not all.
 4. **`delete` `reconcile`** — drop the keys that left upstream; once a day, sweep the bucket
@@ -70,11 +73,12 @@ nothing for bandwidth, so traffic doesn't move the bill.
    hostname.
 3. Add the four repository secrets below. They are the whole requirement.
 4. Actions -> sync -> Run workflow. The first run finds an empty bucket and fills it
-   (about 140 GB), `max_batches` at a time, queueing the next run itself until the delta is
+   (about 140 GB), four batches at a time, queueing the next run itself until the delta is
    empty; every run after that pushes the hourly delta. Storage past R2's free 10 GB costs
    about $1.95 a month.
-5. Uncomment the `schedule:` block in `sync.yml` with a minute per hour to run the sync
-   automation.
+5. Start it every hour. Nothing in this repository schedules a run: add a `schedule:`
+   trigger to `sync.yml` with a minute of your own, or dispatch it from outside, as this
+   mirror is.
 
 | Secret | What it is |
 | --- | --- |
@@ -83,12 +87,15 @@ nothing for bandwidth, so traffic doesn't move the bill.
 | `AWS_ENDPOINT_URL` | `https://<account-id>.r2.cloudflarestorage.com` |
 | `AWS_REGION` | `auto` |
 
-To test or run locally:
+To test or run locally, with `task` and Docker (or Apple's `container`) installed:
 
 ```sh
-task run -- task --dry sync
-task run -- task sync
+task check    # render every command of the pipeline inside the toolbox image; diff it against render.txt
+task sync     # one run, with the four AWS_* variables and HEALTHCHECK_URL exported
 ```
+
+The image, the engine's verbs and the two workflows this repository calls are
+[katoptra/lib](https://github.com/katoptra/lib)'s, pinned to `v1`.
 
 ## Reference
 
