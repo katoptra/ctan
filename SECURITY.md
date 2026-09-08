@@ -30,7 +30,7 @@ a file that is not there.
 
 If you find a way to serve altered or unsigned content through `ctan.ijosh.com`, or a
 weakness in the pipeline itself, report it privately through
-[GitHub's vulnerability reporting](https://github.com/jshvn/ctan/security/advisories/new).
+[GitHub's vulnerability reporting](https://github.com/katoptra/ctan/security/advisories/new).
 Please do not open a public issue for it.
 
 Problems with the packages themselves (a malicious or broken upstream package) belong to
