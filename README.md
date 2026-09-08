@@ -1,8 +1,8 @@
 # ctan
 
-[![sync](https://github.com/jshvn/ctan/actions/workflows/sync.yml/badge.svg)](https://github.com/jshvn/ctan/actions/workflows/sync.yml)
-[![license](https://img.shields.io/github/license/jshvn/ctan)](https://github.com/jshvn/ctan/blob/main/LICENSE)
-[![mirror](https://healthchecks.io/b/2/f4ad55cc-4b2d-4cce-b133-aba5381d9e71.svg)](https://github.com/jshvn/ctan/actions/workflows/sync.yml)
+[![sync](https://github.com/katoptra/ctan/actions/workflows/sync.yml/badge.svg)](https://github.com/katoptra/ctan/actions/workflows/sync.yml)
+[![license](https://img.shields.io/github/license/katoptra/ctan)](https://github.com/katoptra/ctan/blob/main/LICENSE)
+[![mirror](https://healthchecks.io/b/2/f4ad55cc-4b2d-4cce-b133-aba5381d9e71.svg)](https://github.com/katoptra/ctan/actions/workflows/sync.yml)
 
 An hourly mirror of all of [CTAN](https://ctan.org) on Cloudflare R2, served at
 `https://ctan.ijosh.com/` with every CTAN path at the root. About 511,000 files and 140 GB.
@@ -32,7 +32,7 @@ To go back to CTAN's mirror rotation: `tlmgr option repository ctan`.
 ## How it works
 
 On an hourly schedule this GitHub action is triggered and runs the following pipeline.
-Every step is a task in [`Taskfile.yml`](https://github.com/jshvn/ctan/blob/main/Taskfile.yml):
+Every step is a task in [`Taskfile.yml`](https://github.com/katoptra/ctan/blob/main/Taskfile.yml):
 
 1. **`clock` `list` `state` `rebuild`** — stamp the hour, list CTAN's master (dante), and
    fetch the listing the previous run left in the bucket, rebuilding it if it went missing.
@@ -64,7 +64,7 @@ nothing for bandwidth, so traffic doesn't move the bill.
 
 ## Want your own?
 
-1. Fork [this repo](https://github.com/jshvn/ctan) and create an R2 bucket named `ctan` with
+1. Fork [this repo](https://github.com/katoptra/ctan) and create an R2 bucket named `ctan` with
    a custom domain pointing at it.
 2. Set `HOST` in `Taskfile.yml` to that domain — the only line in the repo that names the
    hostname.
