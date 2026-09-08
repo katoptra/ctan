@@ -47,7 +47,7 @@ includes:
         "${c}offline checks -- no network, no credentials, inside the image, over fixtures/${r}"
         "  task run -- task pages RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging"
         "                    ${d}indexed.txt vs applied.txt -> a page under both keys for every dirty directory${r}"
-        "  task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root"
+        "  task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root/staging"
         "                    ${d}the page check needs STAGING; over file:// only the INDEX key is read${r}"
         "  ${d}the engine's own checks: cd ../lib/examples/rsync && task run -- task offline${r}"
   rsync:

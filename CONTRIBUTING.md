@@ -29,7 +29,7 @@ Pull requests are welcome, especially ones that make the pipeline smaller.
 ```sh
 task check                                   # render every command inside the image, diff it against render.txt
 task run -- task pages RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging
-task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root
+task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root/staging
 ```
 
 `task run` pulls the image on first use and mounts the repo at `/work`, which is why the
