@@ -69,9 +69,10 @@ nothing for bandwidth, so traffic doesn't move the bill.
 2. Set `HOST` in `Taskfile.yml` to that domain — the only line in the repo that names the
    hostname.
 3. Add the four repository secrets below. They are the whole requirement.
-4. Actions -> sync -> Run workflow, with `seed` checked and `max_batches` at 40. The first
-   run uploads everything (about 140 GB, a few hours); every run after it pushes the hourly
-   delta. Storage past R2's free 10 GB costs about $1.95 a month.
+4. Actions -> sync -> Run workflow. The first run finds an empty bucket and fills it
+   (about 140 GB), `max_batches` at a time, queueing the next run itself until the delta is
+   empty; every run after that pushes the hourly delta. Storage past R2's free 10 GB costs
+   about $1.95 a month.
 5. Uncomment the `schedule:` block in `sync.yml` with a minute per hour to run the sync
    automation.
 
@@ -97,7 +98,7 @@ Please see [`docs/reference.md`](docs/reference.md) for the full repo documentat
 * **Limits** — R2, Cloudflare, Actions, dante
 * **Cost** — the bill line by line
 * **Monitoring** — the healthchecks.io check and its settings
-* **Runbook** — failed runs, seeds, rebuilds, rotations
+* **Runbook** — failed runs, first fills, rebuilds, rotations
 * **Zone configuration** — every rule, with its expression
 * **Why directory pages** — listings drawn under two keys
 
