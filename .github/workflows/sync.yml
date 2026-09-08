@@ -12,6 +12,6 @@ permissions:
 concurrency: {group: sync, cancel-in-progress: false}
 jobs:
   sync:
-    uses: katoptra/lib/.github/workflows/sync.yml@v1
+    uses: katoptra/lib/.github/workflows/sync.yml@a80d19d76766d058e9e10190277525f9d452b21d # v1.0.1
     with: {vars: '${{ inputs.vars }}', timeout-minutes: 355}
     secrets: inherit
