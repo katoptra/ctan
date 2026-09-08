@@ -1,0 +1,8 @@
+name: probe
+on: {pull_request: {}}
+permissions: {contents: read}
+jobs:
+  action-by-sha:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: katoptra/lib/.github/actions/toolbox@a80d19d76766d058e9e10190277525f9d452b21d # v1.0.1
