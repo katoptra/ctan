@@ -21,7 +21,7 @@ Measured 2026-08-26 from a dereferenced dante listing (538,289 lines, 6.9 s wall
 | Largest object | 6,865,013,189 B (`systems/mac/mactex/MacTeX.pkg`) |
 | Longest key | 151 bytes |
 | Distinct directories holding a file directly | 24,953 (24,952 plus the root) |
-| Distinct directories, every one incl. file-less | 27,262: adds 2,309 that hold only subdirectories — what `render` draws a page for (2026-08-27) |
+| Distinct directories, every one incl. file-less | 27,262: adds 2,309 that hold only subdirectories — what `pages` draws a page for (2026-08-27) |
 | Directory-page objects | 54,523: every directory's page under both keys, all but the root's, which has no slashless key |
 | Churn, last 30 days | 16,574 files, 4.72 GB; 23.0 files per hour on average |
 | Hour-slots with any change, last 30 days | 284 of 720 |
@@ -83,7 +83,7 @@ lists the rules the mirror wants and why.
 
 | Limit | Value | What the mirror asks |
 |---|---|---|
-| Job time | 6 h, counted from the actual start | `timeout-minutes: 350` |
+| Job time | 6 h, counted from the actual start | `timeout-minutes: 355` |
 | Runner disk | 14 GB documented | the 1.2 GB toolbox image, plus at most one 4 GB batch and the 6.87 GB outlier |
 | Runner RAM | 16 GB | under 300 MB |
 | Concurrent jobs | 20 on Free | 1; `concurrency: sync` queues an overlapping slot |
@@ -91,21 +91,19 @@ lists the rules the mirror wants and why.
 | Dispatch queueing | one pending run per `concurrency` group; the rest are dropped | a dispatch arriving during a run waits, and the next hour's delta subsumes any it displaced |
 
 Log volume is undocumented and lines are silently dropped, which is why `report` counts from
-`RUN/` and never from the log.
+`.run/` and never from the log.
 
-Nothing caches the toolbox image. Each job is a fresh VM, `docker build` writes to that VM's
-own daemon store, and it dies with the job, so every run rebuilds from the pinned base: 28 s
-measured 2026-08-28, against a job measured in minutes. Within a job the `image` task's
-`status` guard means one build serves every `task run`. Caching it through the Actions cache
-would buy back less than it costs to maintain.
+Nothing caches the toolbox image across jobs. Each job is a fresh VM, and `task image`
+pulls `ghcr.io/katoptra/toolbox:rsync-v1` from GHCR once, before the pipeline; within a
+job its `status` guard means one pull serves every `task run`. Caching it through the
+Actions cache would buy back less than it costs to maintain.
 
-### Docker Hub
+### Registries
 
-Anonymous pulls are limited to 100 per hour per source IP (`ratelimit-limit: 100;w=3600`,
-read from `registry-1.docker.io` on 2026-08-28). Each run pulls the pinned Ubuntu base once,
-so the mirror wants 1 of the 100. The budget is per IP and GitHub's hosted runners share
-egress addresses, so it is not the mirror's alone; a throttled or failed pull fails the run
-at the build, before any of the pipeline has run.
+A run pulls the toolbox image from ghcr.io anonymously and touches no other registry; a
+failed or throttled pull fails the run at `task image`, before any of the pipeline has run.
+Docker Hub, and its 100 anonymous pulls per hour per IP, is katoptra/lib's concern: the
+pinned Ubuntu base is pulled there when lib builds a release, never by a run.
 
 ### dante and CTAN
 
@@ -154,7 +152,7 @@ one million — so any Class A overage at all costs $4.50.
 | Class A per month | 30 reconcile listings + 1,440 state writes + churn + a few thousand directory pages ≈ 45k → $0; drawing every page once is 54.5k |
 | Class B per month | 720 state reads + about 5,760 `smoke` reads ≈ 6.5k → $0 |
 | One uncached `scheme-full` install | 11,919 GETs, 5.51 GB; free until 27 installs a day |
-| Budget | $5/month; `plan` refuses a tree over `CEILING_GB` (200) before anything uploads |
+| Budget | $5/month; `split` refuses a tree over `CEILING_GB` (200) before anything uploads |
 
 Storage is the only line that is ever billed at this size. The design keeps Class A low by
 never listing the bucket outside the daily reconcile: an hourly sync that listed the bucket
@@ -249,7 +247,7 @@ only alert.
 |---|---|
 | Schedule | cron `42 * * * *`, timezone UTC, the minute the dispatcher fires |
 | Grace | 3 h |
-| Pinged by | `ping`, the last task in `sync` |
+| Pinged by | `ping`, the last verb of `pipeline` |
 | Configured by | `HEALTHCHECK_URL`, the check's ping URL, the one optional secret |
 
 The four `AWS_*` secrets are the whole requirement; `HEALTHCHECK_URL` is the fifth and only
@@ -273,16 +271,17 @@ Nothing sends `/start`, so the grace does not cap run duration. Before a first f
 large backlog dispatch, pause the check in the UI — a multi-hour run would otherwise blow the
 grace. A paused check resumes on its next ping.
 
-The second surface is the run's own job page, where `report` appends the delta, upload,
-directory-page, state and storage counts, all read from `RUN/`. It is the first thing to
-read on a run that succeeded and still looks wrong. `report` finds the page through
-`GITHUB_STEP_SUMMARY`; if a run's summary turns up in the step log instead, that variable
-did not reach the container.
+The second surface is the run's own job page, where `report` appends one table: when the
+run started and the image, then the engine's rows (upstream, the delta, uploads, the state,
+storage, the signature), then this mirror's directory-page counts, all read from `.run/`.
+It is the first thing to read on a run that succeeded and still looks wrong. `report` finds
+the page through `GITHUB_STEP_SUMMARY`; if a run's summary turns up in the step log
+instead, that variable did not reach the container.
 
 ## 5. Runbook
 
-Local commands need the four R2 variables in the environment as `sync.yml` maps them, and
-`AWS_CONFIG_FILE=aws.config`.
+Local commands need the four `AWS_*` variables exported; `task sync` passes them into the
+image by name, and the Taskfile sets `AWS_CONFIG_FILE` there.
 Every task is safe to rerun unless its entry says otherwise: a second run makes the same
 writes with the same bytes, or none.
 
@@ -301,15 +300,15 @@ behind the mirror is.
 **Re-run.** `gh workflow run sync.yml`, or `task sync`. Safe: the state is as of the last
 checkpoint and the run recomputes the rest. During a first fill this is the resume.
 
-**The run failed before the pipeline started.** A failure inside `task: [image] docker build`
-is the base image pull, not the mirror: Docker Hub was unreachable or throttling. Nothing was
-uploaded and no state moved, so re-running is the whole fix. Section 2 has the pull budget.
+**The run failed before the pipeline started.** A failure at `task: [image]` is the pull of
+the toolbox image from ghcr.io, not the mirror. Nothing was uploaded and no state moved, so
+re-running is the whole fix.
 
 **Rebuild the state** — a corrupt or distrusted state file. A missing one rebuilds on its
 own at the next run.
 
 ```sh
-gh workflow run sync.yml -f reconcile=true      # or: task sync RECONCILE=true
+gh workflow run sync.yml -f vars='RECONCILE=true'      # or: task sync -- RECONCILE=true
 ```
 
 Lists the bucket and joins it to the upstream listing. Same-size objects are taken as
@@ -319,8 +318,8 @@ mirror and the state is a cache of it; losing the state costs one listing, losin
 bucket costs the fill below.
 
 **First fill.** There is no flag. An empty bucket rebuilds to an empty state, the delta is
-the whole tree, and each run works `max_batches` batches then queues the next run itself
-while batches remain. About 511k Class A and 140 GB from dante, over several chained
+the whole tree, and each run works `MAX_BATCHES` batches (four; `-f vars='MAX_BATCHES=8'`
+for more) then queues the next run itself while batches remain. About 511k Class A and 140 GB from dante, over several chained
 runs. Pause the healthcheck first.
 
 **Delete one key.**
@@ -502,7 +501,7 @@ directories have a dot in their own name** (`biblio/bibtex/utils/bibview-2.0/`,
 retry the 404 with a slash, but it would sit in front of every request to the mirror, and
 Workers Paid at $5/month is more than the whole bucket costs.
 
-So `render` writes each page under both keys, `<dir>/INDEX` and `<dir>`, and the slashless
+So `pages` writes each page under both keys, `<dir>/INDEX` and `<dir>`, and the slashless
 one answers with the listing rather than a redirect. A key can hold a page or a CTAN file
 and never both, because upstream is a filesystem, where a name is a directory or a file.
 Three consequences worth keeping in mind:
