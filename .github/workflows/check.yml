@@ -3,4 +3,4 @@ on: {pull_request: {}}
 permissions: {contents: read}
 jobs:
   check:
-    uses: katoptra/lib/.github/workflows/check.yml@a80d19d76766d058e9e10190277525f9d452b21d # v1.0.1
+    uses: katoptra/lib/.github/workflows/check.yml@04f7901cf1aa7551bc43db5ff801a225a189c42a # v1.0.2
