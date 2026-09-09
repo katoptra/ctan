@@ -248,9 +248,9 @@ only alert.
 | Schedule | cron `42 * * * *`, timezone UTC, the minute the dispatcher fires |
 | Grace | 3 h |
 | Pinged by | `ping`, the last verb of `pipeline` |
-| Configured by | `HEALTHCHECK_URL`, the check's ping URL, the one optional secret |
+| Configured by | `HEALTHCHECK_URL`, the check's ping URL, the `healthcheck` section of the vault item |
 
-The four `AWS_*` secrets are the whole requirement; `HEALTHCHECK_URL` is the fifth and only
+The three `AWS_*` values are the whole requirement; `HEALTHCHECK_URL` is the fourth and only
 optional one. Without it `ping` is skipped and the mirror has no alert at all.
 
 The grace covers a queued run: a dispatch that arrives while a run is going waits for it
@@ -280,8 +280,9 @@ instead, that variable did not reach the container.
 
 ## 5. Runbook
 
-Local commands need the four `AWS_*` variables exported; `task sync` passes them into the
-image by name, and the Taskfile sets `AWS_CONFIG_FILE` there.
+Local commands need the 1Password CLI signed in: `task sync` wraps the run in `op run`, which
+resolves `op.env` and passes the values into the image by name, and the Taskfile sets
+`AWS_CONFIG_FILE` there.
 Every task is safe to rerun unless its entry says otherwise: a second run makes the same
 writes with the same bytes, or none.
 
@@ -348,11 +349,9 @@ which are otherwise redrawn only when their directory changes.
 is 200 and the directory URL is not, the second Transform Rule in section 6 is missing or
 mis-scoped.
 
-**Rotate a secret.**
+**Rotate a secret.** Edit the `r2` section of item `ctan` in the 1Password app, then:
 
 ```sh
-gh secret set AWS_ACCESS_KEY_ID
-gh secret set AWS_SECRET_ACCESS_KEY
 gh workflow run sync.yml && gh run watch
 ```
 

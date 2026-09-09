@@ -71,7 +71,9 @@ nothing for bandwidth, so traffic doesn't move the bill.
    a custom domain pointing at it.
 2. Set `HOST` in `Taskfile.yml` to that domain — the only line in the repo that names the
    hostname.
-3. Add the three repository secrets below. They are the whole requirement.
+3. Put the values below in a 1Password vault, point `op.env` at it, and add one repository
+   secret, `OP_SERVICE_ACCOUNT_TOKEN`, for a service account that can read the vault. That
+   is the whole requirement.
 4. Actions -> sync -> Run workflow. The first run finds an empty bucket and fills it
    (about 140 GB), four batches at a time, queueing the next run itself until the delta is
    empty; every run after that pushes the hourly delta. Storage past R2's free 10 GB costs
@@ -80,17 +82,21 @@ nothing for bandwidth, so traffic doesn't move the bill.
    trigger to `sync.yml` with a minute of your own, or dispatch it from outside, as this
    mirror is.
 
-| Secret | What it is |
-| --- | --- |
-| `AWS_ACCESS_KEY_ID` | R2 API token with Object Read & Write on the bucket |
-| `AWS_SECRET_ACCESS_KEY` | That token's secret |
-| `AWS_ENDPOINT_URL` | `https://<account-id>.r2.cloudflarestorage.com` |
+The references in `op.env` name one item, `ctan`, with two sections:
 
-To test or run locally, with `task` and Docker (or Apple's `container`) installed:
+| Section | Field | What it is |
+| --- | --- | --- |
+| `r2` | `access_key_id` | R2 API token with Object Read & Write on the bucket |
+| `r2` | `secret_access_key` | That token's secret |
+| `r2` | `endpoint` | `https://<account-id>.r2.cloudflarestorage.com` |
+| `healthcheck` | `url` | Optional: a healthchecks.io ping URL |
+
+To test or run locally, with `task`, the 1Password CLI and Docker (or Apple's `container`)
+installed:
 
 ```sh
 task check    # render every command of the pipeline inside the toolbox image; diff it against render.txt
-task sync     # one run, with the three AWS_* variables and HEALTHCHECK_URL exported
+task sync     # one run; op run resolves op.env around it
 ```
 
 The image, the engine's verbs and the two workflows this repository calls are
