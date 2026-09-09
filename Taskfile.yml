@@ -1,11 +1,12 @@
 # Mirror all of CTAN into a Cloudflare R2 bucket, hourly, from a list diff: dante's listing
 # against the state the last run left in the bucket. The toolbox, which starts a run,
 # contains it in an image, resolves its secrets, renders and checks it, and reports it, and
-# the rsync engine, which moves the bytes, are katoptra/lib's, included below at v1 and
-# flattened into this file. What is here is the mirror's own: its identity, the pipeline in
-# order, the directory page every directory is served under two keys, the checks that read
-# the domain back, and its row of the report. R2 is reached through the AWS CLI, configured
-# by the four AWS_* repository secrets, which cross into the image by name (PASS).
+# the rsync engine, which moves the bytes and orders the pipeline, are katoptra/lib's,
+# included below at v1 and flattened into this file. What is here is the mirror's own: its
+# identity, the directory page every directory is served under two keys, the checks that
+# read the domain back after the engine's sample, its row of the report, and the offline
+# check over fixtures/. R2 is reached through the AWS CLI, configured by the three AWS_*
+# repository secrets, which cross into the image by name (PASS).
 version: '3'
 
 vars:
@@ -15,23 +16,17 @@ vars:
   TL: systems/texlive/tlnet                     # the one signed subtree
   TL_KEY: C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC   # tug.org/texlive/verify.html
   CEILING_GB: 200                               # refuse to run past this many decimal GB upstream
-  BATCH_GB: 4                                   # decimal GB per batch; a file over it is a batch by itself
   LIST_FLOOR: 400000                            # a listing under this many lines is a truncated one; CTAN is ~511k files
   INDEXED: .state/indexed.txt.xz               # the state as the directory pages last showed it
   INDEX: '{{.HOST}}.directory.index.html'      # the page index draws in every directory; no upstream path can carry the name
-  # Every page is written under two keys: <dir>/INDEX, which the zone's rewrite serves for a
-  # directory URL, and <dir> without its trailing slash, which serves the same URL written
-  # without one, where every other mirror answers 301. No filesystem holds both a/b and
-  # a/b/, so the second copies stage one tree per directory depth and upload a tree at a time.
-  SLASH: '{{.ROOT_DIR}}/.run/slash'         # under the toolbox's .run; a root var cannot name RUN, which the include defines after it
 
 env:
   AWS_CONFIG_FILE: '{{.ROOT_DIR}}/aws.config'
 
 # Two includes, one namespace. A verb both an include and this file define is a parse
 # error unless the include excludes it: the report hooks, and the two engine hooks this
-# mirror fills. MAX_BATCHES and RECONCILE are the engine's inline defaults, so a run sets
-# them: task sync -- MAX_BATCHES=8 RECONCILE=true.
+# mirror fills. MAX_BATCHES, BATCH_GB and RECONCILE are the engine's inline defaults, so
+# a run sets them: task sync -- MAX_BATCHES=8 RECONCILE=true.
 includes:
   toolbox:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v1/toolbox.yml
@@ -41,51 +36,27 @@ includes:
       NAME: ctan
       DESC: an hourly mirror of {{.SOURCE}} at https://{{.HOST}}/
       IMAGE: ghcr.io/katoptra/toolbox:rsync-v1
-      PASS: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL AWS_REGION
+      PASS: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL
       MENU: >-
         ""
         "${c}offline checks -- no network, no credentials, inside the image, over fixtures/${r}"
-        "  task run -- task pages RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging"
-        "                    ${d}indexed.txt vs applied.txt -> a page under both keys for every dirty directory${r}"
-        "  task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root/staging"
-        "                    ${d}the page check needs STAGING; over file:// only the INDEX key is read${r}"
+        "  task run -- task offline  The read-back checks, then the directory pages, over a canned hour"
         "  ${d}the engine's own checks: cd ../lib/examples/rsync && task run -- task offline${r}"
   rsync:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v1/engines/rsync.yml
     flatten: true
-    excludes: [index, smoke]
+    excludes: [index, smoke-mirror]
 
 tasks:
-  pipeline:
-    desc: clock -> list -> state -> rebuild? -> diff -> split -> prepare -> batches -> delete -> reconcile? -> index -> smoke -> report -> ping
-    cmds:
-      - {task: clock}
-      - {task: list}
-      - {task: state}
-      - {task: rebuild}
-      - {task: diff}
-      - {task: split}
-      - {task: prepare}
-      - {task: batches}
-      - {task: delete}
-      - {task: reconcile}
-      - {task: index}
-      - {task: smoke}
-      - {task: report}
-      - {task: ping}
-
-  plan-pipeline:
-    desc: 'The read-only half: clock -> list -> state -> diff -> split'
-    cmds:
-      - {task: clock}
-      - {task: list}
-      - {task: state}
-      - {task: diff}
-      - {task: split}
-
   pages:
     desc: RUN/indexed.txt against RUN/applied.txt -> a page under both of its keys for every directory a changed line touches, RUN/index-gone.txt for the keys of directories that emptied
     set: [pipefail]
+    vars:
+      # Every page is written under two keys: <dir>/INDEX, which the zone's rewrite serves for a
+      # directory URL, and <dir> without its trailing slash, which serves the same URL written
+      # without one, where every other mirror answers 301. No filesystem holds both a/b and
+      # a/b/, so the second copies stage one tree per directory depth and upload a tree at a time.
+      SLASH: '{{.RUN}}/slash'
     cmds:
       - mkdir -p {{.STAGING}} {{.SLASH}} && find {{.STAGING}} {{.SLASH}} -mindepth 1 -delete
       # A page changes when a file in its directory or a directory below it appears, changes
@@ -147,17 +118,12 @@ tasks:
   index:
     desc: Redraw the directory pages this run changed and publish them; INDEXED, the state the pages last showed, moves forward only after they landed
     set: [pipefail]
+    vars:
+      SLASH: '{{.RUN}}/slash'
     cmds:
-      # Same ls semantics as state. No INDEXED means no page has been drawn: every directory
-      # is drawn once, about 27k PutObjects and ten minutes, and the file exists from then on.
-      - |
-        rc=0; aws s3 ls {{.S3}}/{{.INDEXED}} > /dev/null || rc=$?
-        case $rc in
-          0) aws s3 cp {{.AWS_FLAGS}} {{.S3}}/{{.INDEXED}} {{.RUN}}/indexed.txt.xz
-             xz -dc {{.RUN}}/indexed.txt.xz > {{.RUN}}/indexed.txt ;;
-          1) : > {{.RUN}}/indexed.txt ;;
-          *) exit $rc ;;
-        esac
+      # No INDEXED means no page has been drawn: every directory is drawn once, about 27k
+      # PutObjects and ten minutes, and the file exists from then on.
+      - {task: pull, vars: {KEY: '{{.INDEXED}}', OUT: '{{.RUN}}/indexed.txt', MISSING: ': > {{.RUN}}/indexed.txt'}}
       - {task: pages}
       # cp --recursive guesses text/html from the suffix. The pages stay in staging for smoke;
       # the next run's split clears them. Not appended to publish.txt: smoke sizes that
@@ -170,39 +136,25 @@ tasks:
         for d in {{.SLASH}}/*/; do test -d "$d" || continue;
         aws s3 cp {{.AWS_FLAGS}} --recursive --content-type text/html "$d" {{.S3}}/; done
       - {task: remove, vars: {K: '{{.RUN}}/index-gone.txt'}}
-      # A run that dies before this line redraws the same pages next hour.
-      - xz -T0 -c {{.RUN}}/applied.txt > {{.RUN}}/indexed.new.xz
-      - aws s3 cp {{.AWS_FLAGS}} {{.RUN}}/indexed.new.xz {{.S3}}/{{.INDEXED}}
+      # The pages now show the state, and the bucket already holds it: checkpoint put it there
+      # before this verb ran. One server-side copy moves INDEXED forward; no bytes leave the
+      # runner. A run that dies before this line redraws the same pages next hour.
+      - aws s3 cp {{.AWS_FLAGS}} {{.S3}}/{{.STATE}} {{.S3}}/{{.INDEXED}}
 
-  smoke:
-    desc: Read /timestamp and a sample of this run's keys back through the domain; sizes must match the listing, the tlpdb sha512 must match the verified copy, HTML must reach the client as the bucket holds it, and a Perl client must not be turned away
+  smoke-mirror:
+    desc: After the engine's sample, one redrawn page read back under both of its keys, the HTML canary against the bucket, and a Perl client not turned away
     vars:
-      # The two checks below that name /timestamp ask for it only once the state says it
-      # landed. It rides the decision batch, the last one, so a first fill capped at MAX_BATCHES has
+      # The Perl check names /timestamp and asks for it only once the state says it landed.
+      # It rides the decision batch, the last one, so a first fill capped at MAX_BATCHES has
       # not reached it and the bucket answers 404 to a key it has never held; the hour it
       # lands and every hour after name it. Empty is the only falsy value, so the path is
       # both the flag and the key.
       TS:
         sh: awk -F'\t' '$1 == "timestamp" { print $1 }' {{.RUN}}/applied.txt 2>/dev/null || true
     cmds:
-      # The sample is read back by its encoded URL and looked up by its raw path; a sampled
-      # key is as likely as any other to carry a space.
-      - >-
-        { {{if .TS}}echo {{.TS}};{{end}}
-        grep -h '^upload:' {{.RUN}}/publish.txt 2>/dev/null | sed 's|^upload: .* to s3://{{.BUCKET}}/||' | head -3; }
-        | {{.ENCODE}} | while IFS="$(printf '\t')" read -r k u; do
-        want=$(awk -F'\t' -v k="$k" '$1 == k { print $2 }' {{.RUN}}/upstream.txt);
-        got=$({{.CURL}} -r 0-0 -D - -o /dev/null "{{.URL}}/$u" | {{.SIZE}});
-        echo "$k: $got bytes (listing: $want)"; test "$got" = "$want" || exit 1; done
-      # The tlpdb key rides the decision batch, the last one, so a run that stopped at
-      # MAX_BATCHES has not published this hour's copy yet and has nothing to compare.
-      - >-
-        test ! -f {{.RUN}}/tl/tlpkg/texlive.tlpdb.sha512 ||
-        test "$(ls {{.RUN}}/batch-*.txt 2>/dev/null | wc -l)" -gt {{.MAX_BATCHES | default 4}} ||
-        {{.CURL}} {{.URL}}/{{.TL}}/tlpkg/texlive.tlpdb.sha512 | cmp - {{.RUN}}/tl/tlpkg/texlive.tlpdb.sha512
       # One redrawn page under both of its keys, read back by key (no zone rule needed) and
-      # sized against the copy still in staging, the same one-byte ranged read as the sample
-      # above. Both keys hold the same bytes, so one staged copy sizes both. The root is
+      # sized against the copy still in staging, the same one-byte ranged read as the engine's
+      # sample. Both keys hold the same bytes, so one staged copy sizes both. The root is
       # drawn but has no slashless key, and / is CTAN's own index.html.
       # ${d} in braces: the INDEX that follows it opens with a letter, and $d{{.INDEX}} names
       # a variable that does not exist. test -n makes that a stated failure, not a size of "".
@@ -240,8 +192,26 @@ tasks:
 
   report-mirror:
     desc: The mirror's row of the run summary, after the toolbox's and the engine's
+    internal: true
     silent: true
     cmds:
       - |
         n() { test -f "$1" && wc -l < "$1" || echo 0; }
         echo "| Directory pages | $(n {{.RUN}}/index-make.txt) redrawn under both keys, $(n {{.RUN}}/index-gone.txt) keys removed |" >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+
+  offline:
+    desc: smoke, then pages, over fixtures/run-root copied under .run, inside the image; no network, no credentials
+    vars:
+      F: '{{.RUN}}/fixtures/run-root'
+    cmds:
+      # The verbs write beside what they read, so they work on a copy.
+      - mkdir -p {{.RUN}} && rm -rf {{.RUN}}/fixtures && cp -R {{.ROOT_DIR}}/fixtures {{.RUN}}/fixtures
+      # The read-back first: pages empties staging. Over file:// the engine samples the
+      # timestamp the fixture staged and smoke-mirror sizes the page it staged, by the INDEX
+      # key alone; a filesystem cannot hold the slashless key beside it.
+      - {task: smoke, vars: {RUN: '{{.F}}', STAGING: '{{.F}}/staging', URL: 'file://{{.F}}/staging'}}
+      # run-root: the hour whose only change is timestamp, so its one dirty directory is the
+      # root, which has no slashless key: one page, an empty slash tree, no key removed.
+      - {task: pages, vars: {RUN: '{{.F}}', STAGING: '{{.F}}/staging'}}
+      - test "$(cat {{.F}}/index-make.txt)" = "" && test -s {{.F}}/staging/{{.INDEX}} && test ! -s {{.F}}/index-gone.txt && test -z "$(ls -A {{.F}}/slash)"
+      - 'echo "offline: every check passed"'
