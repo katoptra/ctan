@@ -11,7 +11,7 @@ version: '3'
 
 vars:
   SOURCE: rsync://rsync.dante.ctan.org/CTAN/   # the master; the register page asks for it
-  HOST: ctan.ijosh.com                          # a fork changes this line
+  HOST: ctan.katoptra.org                       # a fork changes this line
   BUCKET: ctan                                  # bucket name; objects sit at its root under CTAN's own paths
   TL: systems/texlive/tlnet                     # the one signed subtree
   TL_KEY: C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC   # tug.org/texlive/verify.html

@@ -1,7 +1,7 @@
 # ctan
 
 An hourly mirror of all of `CTAN/` (dante's `rsync://rsync.dante.ctan.org/CTAN/`) on
-Cloudflare R2, served at `https://ctan.ijosh.com/` with every CTAN path at the bucket root.
+Cloudflare R2, served at `https://ctan.katoptra.org/` with every CTAN path at the bucket root.
 About 511,000 objects and 140 GB; the largest file is 6.87 GB. Storage is the only bill,
 about $1.95 a month; the pipeline refuses to run past 200 GB upstream.
 
@@ -165,7 +165,7 @@ Every check runs inside the toolbox image.
 - `publish`, `checkpoint`, `delete`, `rebuild`, `index` need credentials; a fork tests them
   with `BUCKET` in `Taskfile.yml` pointed at a scratch bucket and
   `task sync -- MAX_BATCHES=1 BATCH_GB=1`.
-- Is the mirror fresh? `curl -s https://ctan.ijosh.com/timestamp`.
+- Is the mirror fresh? `curl -s https://ctan.katoptra.org/timestamp`.
 
 Seven hazards, each of which has cost an evening:
 
