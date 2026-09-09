@@ -50,10 +50,13 @@ CTAN's own `index.html`. Operational detail belongs here and in Taskfile comment
   directory, a name no upstream path can carry. Every directory also holds that page under a
   second key, the directory without its trailing slash, which no upstream path can carry
   either: upstream is a filesystem, where a name is a directory or a file and never both.
-- Secrets are exactly four: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
-  `HEALTHCHECK_URL`. The three `AWS_*`, named in `PASS`, cross into the image by name;
-  `HEALTHCHECK_URL` always crosses, and without it `ping` is skipped. `AWS_REGION` is
-  `auto` in the image.
+- Secrets live in 1Password, vault `Katoptra`, item `ctan`: section `r2` (`access_key_id`,
+  `secret_access_key`, `endpoint`) and section `healthcheck` (`url`). `op.env` maps them to
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL` and `HEALTHCHECK_URL`,
+  resolved by `op run` around the whole run and crossing into the image by name. The
+  organization secret `OP_SERVICE_ACCOUNT_TOKEN`, inherited by every repository, is a
+  service account that reads that vault. Without `HEALTHCHECK_URL`, `ping` is skipped.
+  `AWS_REGION` is `auto` in the image.
 - Recompute any change that adds storage against the 140 GB baseline and the 200 GB ceiling.
 
 ## Must knows
@@ -190,10 +193,10 @@ Seven hazards, each of which has cost an evening:
   root files alone (`timestamp` by itself), and one where a deletion takes the last file under
   a top-level directory, leaving no dirty directory that still exists. Every `xargs` whose
   input can be filtered down to nothing takes `-r`.
-- **Only what `PASS` names crosses into the container**, beside `GITHUB_STEP_SUMMARY`,
+- **Only what `op.env` names crosses into the container**, beside `GITHUB_STEP_SUMMARY`,
   `GITHUB_RUN_ID` and `HEALTHCHECK_URL`, which the toolbox always passes. `report` reads
   `GITHUB_STEP_SUMMARY`, whose value is a path on the runner, so the variable is passed *and*
-  the file bind-mounted at that same path -- a host variable the pipeline reads and `PASS`
+  the file bind-mounted at that same path -- a host variable the pipeline reads and `op.env`
   does not name arrives empty, and the fallback hides it.
 - **A root var shadows the command line inside an engine verb.** `task sync -- BUCKET=x`
   changes nothing for `publish`, because `BUCKET` is a root var; a scratch run edits the

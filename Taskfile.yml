@@ -6,7 +6,7 @@
 # identity, the directory page every directory is served under two keys, the checks that
 # read the domain back after the engine's sample, its row of the report, and the offline
 # check over fixtures/. R2 is reached through the AWS CLI, configured by the three AWS_*
-# repository secrets, which cross into the image by name (PASS).
+# variables op.env resolves from 1Password, which cross into the image by name.
 version: '3'
 
 vars:
@@ -36,7 +36,6 @@ includes:
       NAME: ctan
       DESC: an hourly mirror of {{.SOURCE}} at https://{{.HOST}}/
       IMAGE: ghcr.io/katoptra/toolbox:rsync-v2
-      PASS: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL
       MENU: >-
         ""
         "${c}offline checks -- no network, no credentials, inside the image, over fixtures/${r}"
