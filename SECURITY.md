@@ -28,7 +28,7 @@ a file that is not there.
 
 ## Reporting
 
-If you find a way to serve altered or unsigned content through `ctan.ijosh.com`, or a
+If you find a way to serve altered or unsigned content through `ctan.katoptra.org`, or a
 weakness in the pipeline itself, report it privately through
 [GitHub's vulnerability reporting](https://github.com/katoptra/ctan/security/advisories/new).
 Please do not open a public issue for it.

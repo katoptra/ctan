@@ -290,7 +290,7 @@ writes with the same bytes, or none.
 ```sh
 gh run list --workflow sync.yml --limit 5
 gh run view <id> --log-failed | tail -50
-curl -sI https://ctan.ijosh.com/timestamp | grep -i -E 'last-modified|cf-cache-status'
+curl -sI https://ctan.katoptra.org/timestamp | grep -i -E 'last-modified|cf-cache-status'
 aws s3 cp s3://ctan/.state/applied.txt.xz - | xz -d | wc -l
 ```
 
@@ -344,7 +344,7 @@ This is also how a change to the page's own markup reaches the pages already in 
 which are otherwise redrawn only when their directory changes.
 
 **A directory URL is a 404.** The page is at its key regardless of the zone:
-`curl -sI https://ctan.ijosh.com/systems/knuth/ctan.ijosh.com.directory.index.html`. If that
+`curl -sI https://ctan.katoptra.org/systems/knuth/ctan.katoptra.org.directory.index.html`. If that
 is 200 and the directory URL is not, the second Transform Rule in section 6 is missing or
 mis-scoped.
 
@@ -400,10 +400,10 @@ and an unscoped path match reaches all of it.
 
 | Where | Rule | Expression | What to set |
 |---|---|---|---|
-| Configuration Rules | rewriters and the UA filter off | `(http.host eq "ctan.ijosh.com")` | Email Obfuscation off, Rocket Loader off, Automatic HTTPS Rewrites off, Browser Integrity Check off |
-| Cache Rules | cache off | `(http.host eq "ctan.ijosh.com")` | Cache eligibility: bypass cache |
-| Transform Rules | `/` serves CTAN's `index.html` | `(http.host eq "ctan.ijosh.com" and http.request.uri.path eq "/")` | Rewrite path to `/index.html` |
-| Transform Rules | directory URLs serve the mirror's page | `(http.host eq "ctan.ijosh.com" and ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")` | Rewrite path, dynamic: `concat(http.request.uri.path, "ctan.ijosh.com.directory.index.html")` |
+| Configuration Rules | rewriters and the UA filter off | `(http.host eq "ctan.katoptra.org")` | Email Obfuscation off, Rocket Loader off, Automatic HTTPS Rewrites off, Browser Integrity Check off |
+| Cache Rules | cache off | `(http.host eq "ctan.katoptra.org")` | Cache eligibility: bypass cache |
+| Transform Rules | `/` serves CTAN's `index.html` | `(http.host eq "ctan.katoptra.org" and http.request.uri.path eq "/")` | Rewrite path to `/index.html` |
+| Transform Rules | directory URLs serve the mirror's page | `(http.host eq "ctan.katoptra.org" and ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")` | Rewrite path, dynamic: `concat(http.request.uri.path, "ctan.katoptra.org.directory.index.html")` |
 
 **The Configuration Rule is the one that matters.** Email Address Obfuscation rewrites every
 `text/html` response Cloudflare serves: it injects a script, encodes mailto addresses, and
@@ -429,9 +429,9 @@ them, so leaving it on makes this the one place the mirror is less capable than 
 it copies. Browsers, curl, wget, Go, Java and `requests` are unaffected, which is why every
 casual check passes. `tlmgr` is unaffected too — TeX Live's `TLDownload.pm` sets
 `agent => "texlive/lwp"` explicitly, and its downloader order is `lwp curl wget`, so the
-first thing it tries carries a string the filter allows. Verified off for the mirror's
-hostname alone on 2026-08-28: `ijosh.com` and `www.ijosh.com` still answer `403` to
-`libwww-perl`.
+first thing it tries carries a string the filter allows. Scoped to the mirror's hostname alone:
+the zone's apex and `www` keep answering `403` to `libwww-perl`, which is the check that
+the rule has not widened.
 
 Cloudflare drops `content-length` from `text/html` responses whether or not those features
 are on, which is why `smoke` sizes an object from a one-byte ranged read rather than a HEAD.

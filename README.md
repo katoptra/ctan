@@ -5,26 +5,26 @@
 [![mirror](https://healthchecks.io/b/2/f4ad55cc-4b2d-4cce-b133-aba5381d9e71.svg)](https://github.com/katoptra/ctan/actions/workflows/sync.yml)
 
 An hourly mirror of all of [CTAN](https://ctan.org) on Cloudflare R2, served at
-`https://ctan.ijosh.com/` with every CTAN path at the root. About 511,000 files and 140 GB.
+`https://ctan.katoptra.org/` with every CTAN path at the root. About 511,000 files and 140 GB.
 
 ## How to use
 
-Your request served to `https://mirrors.ctan.org/` might be redirected to this mirror automatically (once I apply for official mirror status). Until then, the full mirror of CTAN is served from `https://ctan.ijosh.com/`.
+Your request served to `https://mirrors.ctan.org/` might be redirected to this mirror automatically (once I apply for official mirror status). Until then, the full mirror of CTAN is served from `https://ctan.katoptra.org/`.
 
 TeX Live and TinyTeX both use `tlmgr`:
 
 ```sh
-tlmgr option repository https://ctan.ijosh.com/systems/texlive/tlnet/
+tlmgr option repository https://ctan.katoptra.org/systems/texlive/tlnet/
 tlmgr update --self --all
 ```
 
 For a fresh install, give the installer the same URL:
 
 ```sh
-install-tl -repository https://ctan.ijosh.com/systems/texlive/tlnet/
+install-tl -repository https://ctan.katoptra.org/systems/texlive/tlnet/
 ```
 
-Browse it: any directory URL, `https://ctan.ijosh.com/systems/knuth/`, lists what the
+Browse it: any directory URL, `https://ctan.katoptra.org/systems/knuth/`, lists what the
 mirror holds there.
 
 To go back to CTAN's mirror rotation: `tlmgr option repository ctan`.
@@ -53,7 +53,7 @@ directory pages and the checks that read them back are this mirror's own verbs:
 **Is it fresh?**
 
 ```sh
-curl -s https://ctan.ijosh.com/timestamp
+curl -s https://ctan.katoptra.org/timestamp
 ```
 
 ## Why use this?
