@@ -94,7 +94,7 @@ task sync     # one run, with the three AWS_* variables and HEALTHCHECK_URL expo
 ```
 
 The image, the engine's verbs and the two workflows this repository calls are
-[katoptra/lib](https://github.com/katoptra/lib)'s: the include and the image at `v1`, the
+[katoptra/lib](https://github.com/katoptra/lib)'s: the include and the image at `v2`, the
 workflows at a release commit.
 
 ## Reference

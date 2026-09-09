@@ -2,7 +2,7 @@
 # against the state the last run left in the bucket. The toolbox, which starts a run,
 # contains it in an image, resolves its secrets, renders and checks it, and reports it, and
 # the rsync engine, which moves the bytes and orders the pipeline, are katoptra/lib's,
-# included below at v1 and flattened into this file. What is here is the mirror's own: its
+# included below at v2 and flattened into this file. What is here is the mirror's own: its
 # identity, the directory page every directory is served under two keys, the checks that
 # read the domain back after the engine's sample, its row of the report, and the offline
 # check over fixtures/. R2 is reached through the AWS CLI, configured by the three AWS_*
@@ -29,13 +29,13 @@ env:
 # a run sets them: task sync -- MAX_BATCHES=8 RECONCILE=true.
 includes:
   toolbox:
-    taskfile: https://raw.githubusercontent.com/katoptra/lib/v1/toolbox.yml
+    taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/toolbox.yml
     flatten: true
     excludes: [report-engine, report-mirror]
     vars:
       NAME: ctan
       DESC: an hourly mirror of {{.SOURCE}} at https://{{.HOST}}/
-      IMAGE: ghcr.io/katoptra/toolbox:rsync-v1
+      IMAGE: ghcr.io/katoptra/toolbox:rsync-v2
       PASS: AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_ENDPOINT_URL
       MENU: >-
         ""
@@ -43,7 +43,7 @@ includes:
         "  task run -- task offline  The read-back checks, then the directory pages, over a canned hour"
         "  ${d}the engine's own checks: cd ../lib/examples/rsync && task run -- task offline${r}"
   rsync:
-    taskfile: https://raw.githubusercontent.com/katoptra/lib/v1/engines/rsync.yml
+    taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/engines/rsync.yml
     flatten: true
     excludes: [index, smoke-mirror]
 

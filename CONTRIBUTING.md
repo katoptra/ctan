@@ -5,7 +5,7 @@ Pull requests are welcome, especially ones that make the pipeline smaller.
 ## Ground rules
 
 - All logic lives in `Taskfile.yml` and in [katoptra/lib](https://github.com/katoptra/lib),
-  whose toolbox and rsync engine it includes at `v1`. lib's README is the contract: the
+  whose toolbox and rsync engine it includes at `v2`. lib's README is the contract: the
   verbs, the vars, the image and its tools, the workflows and how they are pinned. A change
   to how bytes move belongs in the engine, where every mirror gets it; a change to the
   directory pages, the checks that read them back, or their row of the report belongs here.
