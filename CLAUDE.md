@@ -7,37 +7,28 @@ about $1.95 a month; the pipeline refuses to run past 200 GB upstream.
 
 `Taskfile.yml` and its comments are the design of what is this mirror's own; the rsync
 engine and the toolbox it includes from [katoptra/lib](https://github.com/katoptra/lib)
-are the design of everything a mirror shares, and lib's README is their reference.
+are the design of everything a mirror shares, and lib's README is their reference: the
+verbs and their vars, the image and its tools, the workflows and their pins, the include
+rules and how a verb is overridden are documented there once and not repeated here.
 `docs/reference.md` holds the numbers behind this mirror: the measured tree, the platform
 limits and their verification dates, the cost model, the healthcheck settings and the
 runbook.
 
-Everything is in a few files:
+What is this mirror's own:
 
-- `Taskfile.yml`: the mirror's identity in root vars, the two includes from lib at `v1`
-  (the toolbox and the rsync engine, flattened into one namespace), and `pipeline`:
-  `clock -> list -> state -> rebuild? -> diff -> split -> prepare -> batches -> delete -> reconcile? -> index -> smoke -> report -> ping`,
-  where `batches` runs `fetch -> verify -> publish -> checkpoint` per batch. Four verbs are
-  this mirror's own: `pages` and `index` (the directory pages), `smoke` (the read-back
-  checks, replacing the engine's) and `report-mirror` (its row of the report). Bare `task`
-  prints the menu; `task sync` is one run; `task check` renders the pipeline inside the
-  image and diffs it against `render.txt`.
-- `render.txt`: every command of the pipeline as rendered inside the image, committed. A
-  pull request that changes what a run executes changes it, and that diff is the review.
-- `.taskrc.yml`: trusts `raw.githubusercontent.com` for the includes, refetched hourly.
+- `Taskfile.yml`: the identity in root vars (`SOURCE`, `HOST`, `BUCKET`, `TL`, `TL_KEY`,
+  `CEILING_GB`, `LIST_FLOOR`, `INDEXED`, `INDEX`) and five verbs: `pages` and `index`
+  (the directory pages), `smoke-mirror` (the read-back checks the engine's `smoke` runs
+  after its sample), `report-mirror` (its row of the report) and `offline` (the check over
+  `fixtures/`). The pipeline is the engine's. Bare `task` prints the menu; `task sync` is
+  one run; `task check` renders the pipeline inside the image and diffs it against
+  `render.txt`.
 - `aws.config`: single-part uploads under 4 GiB, 512 MiB multipart parts above.
-- `ghcr.io/katoptra/toolbox:rsync-v1`, built and pinned in lib: the toolbox image, and so
-  the pipeline's environment. Every run happens inside it, locally and in Actions alike;
-  `task run -- task <args>` runs any verb in it with the repo at `/work`.
-- `.github/workflows/sync.yml`: ten lines calling lib's reusable `sync.yml`:
-  `workflow_dispatch` alone, one input `vars` (`KEY=value` pairs for the pipeline),
-  `timeout-minutes: 355`, `secrets: inherit`, `actions: write` for the chain. Nothing in
-  this repo starts it: [`jshvn/dispatch`](https://github.com/jshvn/dispatch), a Cloudflare
-  Workflow, POSTs the dispatch hourly at :42. `check.yml` calls lib's `check.yml` on
-  pull requests: `task check` inside the image. Both are pinned to lib's release commit
-  with the version in a trailing comment, because this repository's Actions policy
-  requires a full SHA on every `uses:`; Dependabot bumps them on a lib release. The
-  runner supplies nothing but what lib's action installs.
+- `fixtures/run-root`: the canned hour `offline` reads, whose only change is `timestamp`.
+- `render.txt`, `.taskrc.yml`, the two workflows and `dependabot.yml`: lib's contract, as
+  its README shows them. Nothing in this repo starts a run:
+  [`jshvn/dispatch`](https://github.com/jshvn/dispatch), a Cloudflare Workflow, POSTs the
+  dispatch hourly at :42.
 
 `README.md` is for users and is the mirror's only documentation page; the root URL serves
 CTAN's own `index.html`. Operational detail belongs here and in Taskfile comments.
@@ -46,30 +37,23 @@ CTAN's own `index.html`. Operational detail belongs here and in Taskfile comment
 
 - No shell scripts. Logic lives in `Taskfile.yml` and, for everything shared with the
   other mirrors, in lib; a change to how bytes move goes to the engine, where every mirror
-  gets it. The workflows are callers of lib's.
-- Tools are the toolbox image's, each pinned by checksum in lib's lock: `rsync`, `aws` (CLI
-  v2), `gpgv`, `shasum`, `xz`, `curl`, `task`. The pipeline's network endpoints are exactly
-  dante, R2, the public domain and healthchecks.io; a run adds ghcr.io for the image and
-  raw.githubusercontent.com for the includes. The zone is configured by hand; nothing here
-  calls the Cloudflare API.
-- Two includes, one namespace. A verb both lib and this file define is a parse error unless
-  the include excludes it: `report-engine` and `report-mirror` on the toolbox include,
-  `index` and `smoke` on the engine's. Never redefine a toolbox var (`RUN`, `ENGINE`,
-  `PASS_ENV`) or an engine var (`S3`, `STATE`, `STAGING`, `RSYNC`, `CURL`, `AWS_FLAGS`);
-  a root var also cannot read one, which is why `SLASH` spells out `.run/slash`. Inside an
-  engine verb a root var shadows a command-line `KEY=value`, so `MAX_BATCHES` and
-  `RECONCILE` stay out of the root vars and a run sets them: `task sync -- MAX_BATCHES=8`.
+  gets it. Extension is a hook, never a copy: `smoke-mirror`, not a second `smoke`.
+- Excludes are `report-engine` and `report-mirror` on the toolbox include, `index` and
+  `smoke-mirror` on the engine's. Never redefine a lib var. Inside an engine verb a root
+  var shadows a command-line `KEY=value`, so `MAX_BATCHES`, `BATCH_GB` and `RECONCILE` stay
+  out of the root vars and a run sets them: `task sync -- MAX_BATCHES=8`. A root var cannot
+  read an include's var either, so `SLASH` is a task-level var of `pages` and `index`.
+- The zone is configured by hand; nothing here calls the Cloudflare API.
 - Objects sit at the bucket root under CTAN's own paths. `.state/` is the one reserved
   prefix; CTAN has no dot-prefixed root entry, so it cannot collide.
   `<HOST>.directory.index.html` is the one reserved file name: the page `index` draws in every
   directory, a name no upstream path can carry. Every directory also holds that page under a
   second key, the directory without its trailing slash, which no upstream path can carry
   either: upstream is a filesystem, where a name is a directory or a file and never both.
-- Secrets are exactly five: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
-  `AWS_REGION`, `HEALTHCHECK_URL`. lib's workflow exports every repository secret into the
-  run's environment, and the four `AWS_*`, named in `PASS`, cross into the image by name;
-  `HEALTHCHECK_URL` always crosses. The four are the whole requirement; without
-  `HEALTHCHECK_URL`, `ping` is skipped.
+- Secrets are exactly four: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`,
+  `HEALTHCHECK_URL`. The three `AWS_*`, named in `PASS`, cross into the image by name;
+  `HEALTHCHECK_URL` always crosses, and without it `ping` is skipped. `AWS_REGION` is
+  `auto` in the image.
 - Recompute any change that adds storage against the 140 GB baseline and the 200 GB ceiling.
 
 ## Must knows
@@ -164,32 +148,23 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
 
 ## Verifying a change
 
-Every check runs inside the toolbox image. `fixtures/` (git-excluded) holds the canned run
-directories the checks below read; `run-root` is the hour whose only change is `timestamp`.
+Every check runs inside the toolbox image.
 
 - `task check` renders every command of the pipeline inside the image and diffs it
   against `render.txt`; `task render-update` accepts a change. The `check` workflow does
   the same on every pull request.
-- `task run -- task pages RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging`
-  from canned `applied.txt` and `indexed.txt`. The image bind-mounts the repo, so a real
-  listing renders onto the host's filesystem and the host's case sensitivity is what
-  counts: CTAN has `obsolete/support/TeXshell/` and `texshell/`, which a macOS disk merges
-  into one entry holding one of the two pages. Expect a full render there to come out one
-  page short under each key. The runner is ext4 and draws both. `run-root`, whose two files
-  differ only in the `timestamp` line, is the hour whose one dirty directory is the root:
-  it must exit 0 and leave `SLASH` empty. `pages` empties `STAGING` first, so run `smoke`
-  before it, or both on a copy.
-- `task run -- task smoke RUN=/work/fixtures/run-root STAGING=/work/fixtures/run-root/staging URL=file:///work/fixtures/run-root/staging`.
-  `STAGING` is what sizes the page the fixture serves, so the page check runs rather than
-  being skipped; over `file://` only the INDEX key is read, because a filesystem cannot
-  hold both `a/b` and `a/b/`.
-- The engine's verbs (`diff`, `split`, `merge`, `retry`, and the signed checks `prepare`
-  and `verify`) are checked in lib: `cd ../lib/examples/rsync && task run -- task offline`
-  over its `fixtures/`. They read `RUN` and `STAGING` from lib's includes, which a
-  command-line `RUN=` cannot reach from this repo; a verb of this file, or a call var in
-  lib's example, can.
+- `task run -- task offline`: the engine's `smoke` (its sample, then this mirror's
+  `smoke-mirror`) and then `pages`, over `fixtures/run-root` copied under `.run`. That
+  hour's one dirty directory is the root, which has no slashless key: it must draw the root
+  page, leave `slash/` empty and remove no key. Over `file://` only the INDEX key is read,
+  because a filesystem cannot hold both `a/b` and `a/b/`. A real listing rendered onto a
+  macOS disk comes out one page short under each key: CTAN has `obsolete/support/TeXshell/`
+  and `texshell/`, which a case-insensitive disk merges. The runner is ext4 and draws both.
+- The engine's verbs, `diff`, `split`, `merge`, `retry` and the signed checks `prepare`
+  and `verify`, are checked in lib: `cd ../lib/examples/rsync && task run -- task offline`.
 - `publish`, `checkpoint`, `delete`, `rebuild`, `index` need credentials; a fork tests them
-  with `BUCKET` in `Taskfile.yml` pointed at a scratch bucket and `MAX_BATCHES=1 BATCH_GB=1`.
+  with `BUCKET` in `Taskfile.yml` pointed at a scratch bucket and
+  `task sync -- MAX_BATCHES=1 BATCH_GB=1`.
 - Is the mirror fresh? `curl -s https://ctan.ijosh.com/timestamp`.
 
 Seven hazards, each of which has cost an evening:
@@ -222,4 +197,5 @@ Seven hazards, each of which has cost an evening:
   does not name arrives empty, and the fallback hides it.
 - **A root var shadows the command line inside an engine verb.** `task sync -- BUCKET=x`
   changes nothing for `publish`, because `BUCKET` is a root var; a scratch run edits the
-  Taskfile. What a run can set is what the root leaves to the engine's inline defaults.
+  Taskfile. What a run can set is what the root leaves to the engine's inline defaults,
+  which is why no root var here restates one.

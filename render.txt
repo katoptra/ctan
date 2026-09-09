@@ -16,18 +16,17 @@ task: [normalise] awk '
 | LC_ALL=C sort > /work/.run/upstream.txt
 task: [normalise] test "$(wc -l < /work/.run/upstream.txt)" -gt 400000
 task: [state] mkdir -p /work/.run
-task: [state] rc=0; aws s3 ls s3://ctan/.state/applied.txt.xz > /dev/null || rc=$?
+task: [pull] rc=0; aws s3 ls s3://ctan/.state/applied.txt.xz > /dev/null || rc=$?
 case $rc in
-  0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/applied.txt.xz /work/.run/applied.txt.xz
-     xz -dc /work/.run/applied.txt.xz > /work/.run/applied.txt ;;
+  0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/applied.txt.xz /work/.run/applied.txt.xz && xz -dc /work/.run/applied.txt.xz > /work/.run/applied.txt ;;
   1) echo "no state at .state/applied.txt.xz: rebuilding it from the bucket" >&2; touch /work/.run/rebuild-now ;;
   *) exit $rc ;;
 esac
 
 task: [rebuild] { aws s3 ls --recursive s3://ctan/ || test $? -eq 1; } | awk '{ if (match($0, /^[^ ]+ +[^ ]+ +[0-9]+ /)) print substr($0, RLENGTH + 1) "\t" $3 }' | LC_ALL=C sort > /work/.run/bucket.txt
 task: [rebuild] LC_ALL=C join -t "$(printf '\t')" -o 1.1,1.2,1.3,2.2 /work/.run/upstream.txt /work/.run/bucket.txt | awk -F'\t' -v OFS='\t' '$2 == $4 { print $1, $2, $3 }' > /work/.run/applied.new
-task: [rebuild] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
-task: [rebuild] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
+task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [rebuild] mv /work/.run/applied.new /work/.run/applied.txt
 task: [rebuild] rm -f /work/.run/rebuild-now
 task: [diff] LC_ALL=C comm -13 /work/.run/applied.txt /work/.run/upstream.txt > /work/.run/changed.txt
@@ -62,7 +61,7 @@ task: [retry] for i in 1 2 3 4 5; do
 done; exit $rc
 
 task: [prepare] xz -dkf /work/.run/tl/tlpkg/texlive.tlpdb.xz
-task: [prepare] cd /work/.run/tl/tlpkg && shasum -a 512 -c texlive.tlpdb.sha512 && gpgv --status-fd 1 --keyring gpg/pubring.gpg texlive.tlpdb.sha512.asc texlive.tlpdb.sha512 | awk '/^\[GNUPG:\] GOODSIG /{g=1} /^\[GNUPG:\] VALIDSIG .* C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC$/{v=1} END{exit !(g&&v)}'
+task: [prepare] cd /work/.run/tl/tlpkg && shasum -a 512 -c texlive.tlpdb.sha512 && gpgv --status-fd 1 --keyring gpg/pubring.gpg texlive.tlpdb.sha512.asc texlive.tlpdb.sha512 | awk -v k=C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC '/^\[GNUPG:\] GOODSIG /{g=1} /^\[GNUPG:\] VALIDSIG / && $NF == k {v=1} END{exit !(g&&v)}'
 task: [fetch] find /work/staging -mindepth 1 -delete
 task: [fetch] cut -f1  > /work/.run/files.txt
 task: [retry] for i in 1 2 3 4 5; do
@@ -72,8 +71,8 @@ task: [retry] for i in 1 2 3 4 5; do
   s=$((15 * 2 ** i + RANDOM % (2 * 15 + 1))); echo "rsync exit $rc, retry $i in ${s}s" >&2; sleep $s
 done; exit $rc
 
-task: [verify] cut -f1  | grep -E '^systems/texlive/tlnet/(tlpkg/texlive\.tlpdb|[^/]+)\.sha512$' | while IFS= read -r f; do (cd "$(dirname "$f")" && f=$(basename "$f") && shasum -a 512 -c "$f" && gpgv --status-fd 1 --keyring /work/.run/tl/tlpkg/gpg/pubring.gpg "$f.asc" "$f" | awk '/^\[GNUPG:\] GOODSIG /{g=1} /^\[GNUPG:\] VALIDSIG .* C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC$/{v=1} END{exit !(g&&v)}') || exit 1; done
-task: [verify] test "$(grep -c '^systems/texlive/tlnet/archive/' )" = 0 || { awk -F'\t' -v TL="systems/texlive/tlnet" 'NR == FNR { if (index($1, TL "/archive/") == 1) want[$1] = 1; next }
+task: [verify] cd /work/staging && cut -f1  | grep -E '^systems/texlive/tlnet/(tlpkg/texlive\.tlpdb|[^/]+)\.sha512$' | while IFS= read -r f; do (cd "$(dirname "$f")" && f=$(basename "$f") && shasum -a 512 -c "$f" && gpgv --status-fd 1 --keyring /work/.run/tl/tlpkg/gpg/pubring.gpg "$f.asc" "$f" | awk -v k=C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC '/^\[GNUPG:\] GOODSIG /{g=1} /^\[GNUPG:\] VALIDSIG / && $NF == k {v=1} END{exit !(g&&v)}') || exit 1; done
+task: [verify] cd /work/staging && { test "$(grep -c '^systems/texlive/tlnet/archive/' )" = 0 || { awk -F'\t' -v TL="systems/texlive/tlnet" 'NR == FNR { if (index($1, TL "/archive/") == 1) want[$1] = 1; next }
   /^name /{split($0, a, " "); n = a[2]} /^revision /{split($0, a, " "); r = a[2]}
   /^containerchecksum /{split($0, a, " "); emit(a[2], n)}
   /^doccontainerchecksum /{split($0, a, " "); emit(a[2], n ".doc")}
@@ -82,18 +81,18 @@ task: [verify] test "$(grep -c '^systems/texlive/tlnet/archive/' )" = 0 || { awk
     if (p in want) { print sum "  " p; delete want[p] }
     if (q in want) { print sum "  " q; delete want[q] } }
   END { for (p in want) { print "no checksum in the tlpdb for " p > "/dev/stderr"; bad = 1 } exit bad }' \
- /work/.run/tl/tlpkg/texlive.tlpdb > /work/.run/tl/sums.txt && shasum -a 512 -c --quiet /work/.run/tl/sums.txt; }
-task: [verify] test ! -f systems/texlive/tlnet/tlpkg/texlive.tlpdb || { cmp systems/texlive/tlnet/tlpkg/texlive.tlpdb /work/.run/tl/tlpkg/texlive.tlpdb && xz -dc systems/texlive/tlnet/tlpkg/texlive.tlpdb.xz | cmp - systems/texlive/tlnet/tlpkg/texlive.tlpdb && { cut -f1 /work/.run/applied.txt; cut -f1 ; } | LC_ALL=C sort -u | LC_ALL=C comm -23 - /work/.run/deleted.txt > /work/.run/tl/after.txt && awk -v TL="systems/texlive/tlnet" '/^name /{n=$2}
+ /work/.run/tl/tlpkg/texlive.tlpdb > /work/.run/tl/sums.txt && shasum -a 512 -c --quiet /work/.run/tl/sums.txt; }; }
+task: [verify] cd /work/staging && { test ! -f systems/texlive/tlnet/tlpkg/texlive.tlpdb || { cmp systems/texlive/tlnet/tlpkg/texlive.tlpdb /work/.run/tl/tlpkg/texlive.tlpdb && xz -dc systems/texlive/tlnet/tlpkg/texlive.tlpdb.xz | cmp - systems/texlive/tlnet/tlpkg/texlive.tlpdb && { cut -f1 /work/.run/applied.txt; cut -f1 ; } | LC_ALL=C sort -u | LC_ALL=C comm -23 - /work/.run/deleted.txt > /work/.run/tl/after.txt && awk -v TL="systems/texlive/tlnet" '/^name /{n=$2}
   /^containerchecksum /{print TL "/archive/" n ".tar.xz"}
   /^doccontainerchecksum /{print TL "/archive/" n ".doc.tar.xz"}
   /^srccontainerchecksum /{print TL "/archive/" n ".source.tar.xz"}' systems/texlive/tlnet/tlpkg/texlive.tlpdb \
-| LC_ALL=C sort | LC_ALL=C comm -23 - /work/.run/tl/after.txt > /work/.run/tl/missing.txt && test ! -s /work/.run/tl/missing.txt; }
+| LC_ALL=C sort | LC_ALL=C comm -23 - /work/.run/tl/after.txt > /work/.run/tl/missing.txt && test ! -s /work/.run/tl/missing.txt; }; }
 task: [publish] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 --recursive --exclude timestamp /work/staging/ s3://ctan/ | tee -a /work/.run/publish.txt
 task: [publish] test ! -f /work/staging/timestamp || aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/staging/timestamp s3://ctan/timestamp | tee -a /work/.run/publish.txt
 task: [merge] (cd /work/staging && find . -type f | sed 's|^\./||' | LC_ALL=C sort) > /work/.run/landed.txt
 task: [merge] awk -F'\t' 'NR == FNR { drop[$1] = 1; next } !($1 in drop)'  /work/.run/applied.txt | cat - <(LC_ALL=C join -t "$(printf '\t')" /work/.run/landed.txt ) | LC_ALL=C sort > /work/.run/applied.new
-task: [checkpoint] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
-task: [checkpoint] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
+task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [checkpoint] mv /work/.run/applied.new /work/.run/applied.txt
 task: [checkpoint] find /work/staging -mindepth 1 -delete
 task: [batches] test "$(ls /work/.run/batch-*.txt 2>/dev/null | wc -l)" -le 4 || touch /work/.run/chain
@@ -103,15 +102,15 @@ task: [remove] for f in /work/.run/del-*; do awk 'BEGIN { printf "{\"Objects\":[
 > "$f.json" && aws s3api delete-objects --bucket ctan --delete "file://$f.json" | tee -a /work/.run/publish.txt | { test "$(grep -c Errors)" = 0; }; done
 task: [merge] (cd /work/staging && find . -type f | sed 's|^\./||' | LC_ALL=C sort) > /work/.run/landed.txt
 task: [merge] awk -F'\t' 'NR == FNR { drop[$1] = 1; next } !($1 in drop)' /work/.run/deleted.txt /work/.run/applied.txt | cat - <(LC_ALL=C join -t "$(printf '\t')" /work/.run/landed.txt /work/.run/deleted.txt) | LC_ALL=C sort > /work/.run/applied.new
-task: [checkpoint] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
-task: [checkpoint] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
+task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [checkpoint] mv /work/.run/applied.new /work/.run/applied.txt
 task: [checkpoint] find /work/staging -mindepth 1 -delete
 task: [reconcile] touch /work/.run/rebuild-now
 task: [rebuild] { aws s3 ls --recursive s3://ctan/ || test $? -eq 1; } | awk '{ if (match($0, /^[^ ]+ +[^ ]+ +[0-9]+ /)) print substr($0, RLENGTH + 1) "\t" $3 }' | LC_ALL=C sort > /work/.run/bucket.txt
 task: [rebuild] LC_ALL=C join -t "$(printf '\t')" -o 1.1,1.2,1.3,2.2 /work/.run/upstream.txt /work/.run/bucket.txt | awk -F'\t' -v OFS='\t' '$2 == $4 { print $1, $2, $3 }' > /work/.run/applied.new
-task: [rebuild] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
-task: [rebuild] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
+task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [rebuild] mv /work/.run/applied.new /work/.run/applied.txt
 task: [rebuild] rm -f /work/.run/rebuild-now
 task: [reconcile] awk -F'\t' '!("" in s) { s[""] = 1; print "" }
@@ -123,14 +122,13 @@ task: [remove] for f in /work/.run/del-*; do awk 'BEGIN { printf "{\"Objects\":[
 > "$f.json" && aws s3api delete-objects --bucket ctan --delete "file://$f.json" | tee -a /work/.run/publish.txt | { test "$(grep -c Errors)" = 0; }; done
 task: [merge] (cd /work/staging && find . -type f | sed 's|^\./||' | LC_ALL=C sort) > /work/.run/landed.txt
 task: [merge] awk -F'\t' 'NR == FNR { drop[$1] = 1; next } !($1 in drop)' /work/.run/orphans.txt /work/.run/applied.txt | cat - <(LC_ALL=C join -t "$(printf '\t')" /work/.run/landed.txt /work/.run/orphans.txt) | LC_ALL=C sort > /work/.run/applied.new
-task: [checkpoint] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
-task: [checkpoint] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
+task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [checkpoint] mv /work/.run/applied.new /work/.run/applied.txt
 task: [checkpoint] find /work/staging -mindepth 1 -delete
-task: [index] rc=0; aws s3 ls s3://ctan/.state/indexed.txt.xz > /dev/null || rc=$?
+task: [pull] rc=0; aws s3 ls s3://ctan/.state/indexed.txt.xz > /dev/null || rc=$?
 case $rc in
-  0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/indexed.txt.xz /work/.run/indexed.txt.xz
-     xz -dc /work/.run/indexed.txt.xz > /work/.run/indexed.txt ;;
+  0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/indexed.txt.xz /work/.run/indexed.txt.xz && xz -dc /work/.run/indexed.txt.xz > /work/.run/indexed.txt ;;
   1) : > /work/.run/indexed.txt ;;
   *) exit $rc ;;
 esac
@@ -174,8 +172,7 @@ task: [remove] rm -f /work/.run/del-*; split -l 1000 -a 4 /work/.run/index-gone.
 task: [remove] for f in /work/.run/del-*; do awk 'BEGIN { printf "{\"Objects\":[" } { gsub(/\\/, "\\\\"); gsub(/"/, "\\\"")
      printf "%s{\"Key\":\"%s\"}", (NR > 1 ? "," : ""), $0 } END { print "],\"Quiet\":true}" }' "$f" \
 > "$f.json" && aws s3api delete-objects --bucket ctan --delete "file://$f.json" | tee -a /work/.run/publish.txt | { test "$(grep -c Errors)" = 0; }; done
-task: [index] xz -T0 -c /work/.run/applied.txt > /work/.run/indexed.new.xz
-task: [index] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/indexed.new.xz s3://ctan/.state/indexed.txt.xz
+task: [index] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/applied.txt.xz s3://ctan/.state/indexed.txt.xz
 task: [smoke] {  grep -h '^upload:' /work/.run/publish.txt 2>/dev/null | sed 's|^upload: .* to s3://ctan/||' | head -3; } | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
 function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = substr(s, j, 1)
     out = out ((c ~ /[A-Za-z0-9\/._~-]/) ? c : sprintf("%%%02X", ord[c])) } return out } { print $0 "\t" enc($0) }' | while IFS="$(printf '\t')" read -r k u; do want=$(awk -F'\t' -v k="$k" '$1 == k { print $2 }' /work/.run/upstream.txt); got=$(curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 -r 0-0 -D - -o /dev/null "https://ctan.ijosh.com/$u" | awk 'tolower($1) == "content-range:" { split($3, a, "/"); r = a[2] }
@@ -183,12 +180,12 @@ function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = s
   $2 == "416" { z = 1 }
   END { sub(/\r/, "", r); sub(/\r/, "", c); print (r != "" ? r : (z ? 0 : c)) }'); echo "$k: $got bytes (listing: $want)"; test "$got" = "$want" || exit 1; done
 task: [smoke] test ! -f /work/.run/tl/tlpkg/texlive.tlpdb.sha512 || test "$(ls /work/.run/batch-*.txt 2>/dev/null | wc -l)" -gt 4 || curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 https://ctan.ijosh.com/systems/texlive/tlnet/tlpkg/texlive.tlpdb.sha512 | cmp - /work/.run/tl/tlpkg/texlive.tlpdb.sha512
-task: [smoke] test ! -s /work/.run/index-make.txt || { d=$(tail -1 /work/.run/index-make.txt); want=$(wc -c < "/work/staging/${d}ctan.ijosh.com.directory.index.html" | tr -d ' '); test -n "$want"; case "https://ctan.ijosh.com" in http*) b=1 ;; *) b=0 ;; esac; printf '%s\n' "$d" | awk -v i="ctan.ijosh.com.directory.index.html" -v b="$b" '{ print $0 i } b == 1 && $0 != "" { print substr($0, 1, length($0) - 1) }' | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
+task: [smoke-mirror] test ! -s /work/.run/index-make.txt || { d=$(tail -1 /work/.run/index-make.txt); want=$(wc -c < "/work/staging/${d}ctan.ijosh.com.directory.index.html" | tr -d ' '); test -n "$want"; case "https://ctan.ijosh.com" in http*) b=1 ;; *) b=0 ;; esac; printf '%s\n' "$d" | awk -v i="ctan.ijosh.com.directory.index.html" -v b="$b" '{ print $0 i } b == 1 && $0 != "" { print substr($0, 1, length($0) - 1) }' | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
 function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = substr(s, j, 1)
     out = out ((c ~ /[A-Za-z0-9\/._~-]/) ? c : sprintf("%%%02X", ord[c])) } return out } { print $0 "\t" enc($0) }' | while IFS="$(printf '\t')" read -r k u; do got=$(curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 -r 0-0 -D - -o /dev/null "https://ctan.ijosh.com/$u" | awk 'tolower($1) == "content-range:" { split($3, a, "/"); r = a[2] }
   tolower($1) == "content-length:" { c = $2 }
   $2 == "416" { z = 1 }
   END { sub(/\r/, "", r); sub(/\r/, "", c); print (r != "" ? r : (z ? 0 : c)) }'); echo "$k: $got bytes (page: $want)"; test "$got" = "$want" || exit 1; done; }
-task: [smoke] h=biblio/bibtex/contrib/german/dinat/dinat-index.html; n=$(awk -F'\t' -v k="$h" '$1 == k { print $2 }' /work/.run/applied.txt); case "https://ctan.ijosh.com" in http*) ;; *) n= ;; esac; if test -z "$n"; then echo "html canary skipped ($h is not in the state, or the URL is not http)"; else aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/$h /work/.run/canary.html && curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 https://ctan.ijosh.com/$h | cmp - /work/.run/canary.html && echo "$h: $n bytes, the edge serves what the bucket holds"; fi
-task: [smoke] echo "perl client check skipped (timestamp has not landed yet)"
+task: [smoke-mirror] h=biblio/bibtex/contrib/german/dinat/dinat-index.html; n=$(awk -F'\t' -v k="$h" '$1 == k { print $2 }' /work/.run/applied.txt); case "https://ctan.ijosh.com" in http*) ;; *) n= ;; esac; if test -z "$n"; then echo "html canary skipped ($h is not in the state, or the URL is not http)"; else aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/$h /work/.run/canary.html && curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 https://ctan.ijosh.com/$h | cmp - /work/.run/canary.html && echo "$h: $n bytes, the edge serves what the bucket holds"; fi
+task: [smoke-mirror] echo "perl client check skipped (timestamp has not landed yet)"
 task: [ping] test -z "$HEALTHCHECK_URL" || curl -fsS -m 10 --retry 3 -o /dev/null "$HEALTHCHECK_URL"

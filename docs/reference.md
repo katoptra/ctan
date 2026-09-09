@@ -94,7 +94,7 @@ Log volume is undocumented and lines are silently dropped, which is why `report`
 `.run/` and never from the log.
 
 Nothing caches the toolbox image across jobs. Each job is a fresh VM, and `task image`
-pulls `ghcr.io/katoptra/toolbox:rsync-v1` from GHCR once, before the pipeline; within a
+pulls `ghcr.io/katoptra/toolbox:rsync-v2` from GHCR once, before the pipeline; within a
 job its `status` guard means one pull serves every `task run`. Caching it through the
 Actions cache would buy back less than it costs to maintain.
 
