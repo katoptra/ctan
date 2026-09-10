@@ -1,37 +1,16 @@
 # ctan
 
-An hourly mirror of all of `CTAN/` (dante's `rsync://rsync.dante.ctan.org/CTAN/`) on
-Cloudflare R2, served at `https://ctan.katoptra.org/` with every CTAN path at the bucket root.
-About 511,000 objects and 140 GB; the largest file is 6.87 GB. Storage is the only bill,
-about $1.95 a month; the pipeline refuses to run past 200 GB upstream.
+An hourly mirror of all of CTAN on Cloudflare R2, served at `https://ctan.katoptra.org/`.
+`README.md` says what it mirrors, how to use it, how it works and how to fork it;
+[katoptra/lib](https://github.com/katoptra/lib)'s README is the manual for everything the
+mirrors share; `docs/reference.md` holds the numbers, the runbook and the zone rules.
+This file is what a change must not break.
 
-`Taskfile.yml` and its comments are the design of what is this mirror's own; the rsync
-engine and the toolbox it includes from [katoptra/lib](https://github.com/katoptra/lib)
-are the design of everything a mirror shares, and lib's README is their reference: the
-verbs and their vars, the image and its tools, the workflows and their pins, the include
-rules and how a verb is overridden are documented there once and not repeated here.
-`docs/reference.md` holds the numbers behind this mirror: the measured tree, the platform
-limits and their verification dates, the cost model, the healthcheck settings and the
-runbook.
-
-What is this mirror's own:
-
-- `Taskfile.yml`: the identity in root vars (`SOURCE`, `HOST`, `BUCKET`, `TL`, `TL_KEY`,
-  `CEILING_GB`, `LIST_FLOOR`, `INDEXED`, `INDEX`) and five verbs: `pages` and `index`
-  (the directory pages), `smoke-mirror` (the read-back checks the engine's `smoke` runs
-  after its sample), `report-mirror` (its row of the report) and `offline` (the check over
-  `fixtures/`). The pipeline is the engine's. Bare `task` prints the menu; `task sync` is
-  one run; `task check` renders the pipeline inside the image and diffs it against
-  `render.txt`.
-- `aws.config`: single-part uploads under 4 GiB, 512 MiB multipart parts above.
-- `fixtures/run-root`: the canned hour `offline` reads, whose only change is `timestamp`.
-- `render.txt`, `.taskrc.yml`, the two workflows and `dependabot.yml`: lib's contract, as
-  its README shows them. Nothing in this repo starts a run:
-  [`jshvn/dispatch`](https://github.com/jshvn/dispatch), a Cloudflare Workflow, POSTs the
-  dispatch hourly at :42.
-
-`README.md` is for users and is the mirror's only documentation page; the root URL serves
-CTAN's own `index.html`. Operational detail belongs here and in Taskfile comments.
+Nothing in this repo starts a run: an external scheduler dispatches `sync.yml` hourly at
+:42. `Taskfile.yml` and its comments are the design of what is this mirror's own: the
+identity in root vars, `pages` and `index` (the directory pages), `smoke-mirror`,
+`report-mirror` and `offline`. `aws.config` sets single-part uploads under 4 GiB and
+512 MiB multipart parts above. `fixtures/run-root` is the canned hour `offline` reads.
 
 ## Constraints
 
@@ -50,13 +29,6 @@ CTAN's own `index.html`. Operational detail belongs here and in Taskfile comment
   directory, a name no upstream path can carry. Every directory also holds that page under a
   second key, the directory without its trailing slash, which no upstream path can carry
   either: upstream is a filesystem, where a name is a directory or a file and never both.
-- Secrets live in 1Password, vault `Katoptra`, item `ctan`: section `r2` (`access_key_id`,
-  `secret_access_key`, `endpoint`) and section `healthcheck` (`url`). `op.env` maps them to
-  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL` and `HEALTHCHECK_URL`,
-  resolved by `op run` around the whole run and crossing into the image by name. The
-  organization secret `OP_SERVICE_ACCOUNT_TOKEN`, inherited by every repository, is a
-  service account that reads that vault. Without `HEALTHCHECK_URL`, `ping` is skipped.
-  `AWS_REGION` is `auto` in the image.
 - Recompute any change that adds storage against the 140 GB baseline and the 200 GB ceiling.
 
 ## Must knows

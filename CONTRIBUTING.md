@@ -1,21 +1,19 @@
 # Contributing
 
-Pull requests are welcome, especially ones that make the pipeline smaller.
+The [organization's rules](https://github.com/katoptra/.github/blob/main/CONTRIBUTING.md)
+apply, and [katoptra/lib](https://github.com/katoptra/lib)'s README is the contract for
+everything this mirror includes. This repository adds four.
 
-## Ground rules
-
-- All logic lives in `Taskfile.yml` and in [katoptra/lib](https://github.com/katoptra/lib),
-  whose toolbox and rsync engine it includes at `v2`. lib's README is the contract: the
-  verbs, the vars, the image and its tools, the workflows and how they are pinned. A change
-  to how bytes move belongs in the engine, where every mirror gets it; a change to the
-  directory pages, the checks that read them back, or their row of the report belongs here.
-  Extension is a hook, never a copy of an engine verb.
-- Storage is the bill. The tree is 140 GB and the pipeline refuses to run past 200 GB
-  upstream; if a change adds storage or Class A operations, say by how much in the PR.
-- Objects sit at the bucket root under CTAN's own paths, so every CTAN path is a URL path.
-  `.state/` is the one reserved prefix.
-- The zone is configured by hand and the pipeline never calls the Cloudflare API. Section 6
-  of `docs/reference.md` has the rules it wants.
+- **Storage is the bill.** The tree is 140 GB and the pipeline refuses to run past 200 GB
+  upstream. If a change adds storage or Class A operations, say by how much in the PR.
+- **Objects sit at the bucket root under CTAN's own paths**, so every CTAN path is a URL
+  path. `.state/` is the one reserved prefix and `<HOST>.directory.index.html` the one
+  reserved file name.
+- **The zone is configured by hand** and the pipeline never calls the Cloudflare API.
+  Section 6 of `docs/reference.md` has the rules it wants.
+- **A change to how bytes move belongs in lib's rsync engine**, where every mirror gets
+  it. The directory pages, the checks that read them back and their row of the report
+  belong here. Extension is a hook, never a copy of an engine verb.
 
 ## Checking a change
 
@@ -34,8 +32,3 @@ lib: `cd lib/examples/rsync && task run -- task offline`.
 
 `publish`, `checkpoint`, `delete` and `rebuild` need real R2 credentials and have no mock;
 test them on your own fork with `BUCKET` in `Taskfile.yml` pointed at a scratch bucket.
-
-## Commits
-
-`<type>(<scope>): <summary>` in the imperative, under 75 characters. Types: feat, fix,
-refactor, docs, test, chore, ci. One PR per change; PRs are squash merged.
