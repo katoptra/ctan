@@ -370,10 +370,10 @@ Free and safe; R2 does it itself after 7 days.
 **dante moved.** Edit `SOURCE` in `Taskfile.yml`, open a PR, merge. Until then every run
 spends ten minutes retrying exit 5 and fails, which is the correct loud behaviour.
 
-**The run did not start.** `sync.yml` has one trigger, `workflow_dispatch`, and
-[`jshvn/dispatch`](https://github.com/jshvn/dispatch) is what calls it: a Cloudflare Workflow
-whose cron `42 * * * *` names this repo's `sync.yml` as a target and POSTs the dispatch with
-a GitHub App token.
+**The run did not start.** `sync.yml` has one trigger, `workflow_dispatch`, and an
+external scheduler calls it: in this deployment a Cloudflare Workflow whose cron
+`42 * * * *` names this repo's `sync.yml` as a target and POSTs the dispatch with a GitHub
+App token.
 
 ```sh
 gh run list --workflow sync.yml --limit 3       # createdAt against :42
@@ -382,7 +382,7 @@ gh workflow view sync.yml                       # "disabled" means a manual stop
 
 A run held behind a longer one is normal, and so is a single missing hour — the next
 dispatch fetches that hour's delta too. Two consecutive hours with no run: read the
-dispatcher's Worker logs, check GitHub's status page for an Actions incident, confirm the
+scheduler's own logs, check GitHub's status page for an Actions incident, confirm the
 App is still installed here with `actions: write`, and dispatch by hand meanwhile. A hand
 dispatch is the same run the dispatcher would have started, and no work is lost by waiting —
 only delayed.
