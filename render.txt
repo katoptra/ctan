@@ -1,4 +1,25 @@
-task: [clock] mkdir -p /work/.run && rm -f /work/.run/chain && date -u '+%s %H %u' > /work/.run/start.txt
+task: [clock] mkdir -p /work/.run && rm -f /work/.run/chain /work/.run/reconcile && date -u +%s > /work/.run/start.txt
+task: [pull] rc=0; aws s3 ls s3://ctan/.state/reconciled > /dev/null || rc=$?
+case $rc in
+  0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/reconciled /work/.run/reconciled.xz && xz -dc /work/.run/reconciled.xz > /work/.run/reconciled ;;
+  1) : > /work/.run/reconciled ;;
+  *) exit $rc ;;
+esac
+
+task: [due-rule] rm -f /work/.run/reconcile
+r=auto; h=24
+now=$(cat /work/.run/start.txt); last=$(cat /work/.run/reconciled 2>/dev/null || true)
+case $last in ''|0?*|*[!0-9]*) last=0 ;; esac
+case $h in ''|0*|*[!0-9]*) echo "due: RECONCILE_HOURS is a whole number of hours from 1, not $h" >&2; exit 1 ;; esac
+case $r in
+  true) touch /work/.run/reconcile ;;
+  false) ;;
+  auto) test $(( now - last )) -lt $(( h * 3600 - 1800 )) || touch /work/.run/reconcile ;;
+  *) echo "due: RECONCILE is true, false or auto" >&2; exit 1 ;;
+esac
+test "$last" = 0 && ago="none on record" || ago="$(( (now - last) / 3600 )) h ago"
+echo "due: RECONCILE=$r RECONCILE_HOURS=$h, last reconcile $ago: $(test -f /work/.run/reconcile && echo reconciling || echo not this run)"
+
 task: [list] rm -f /work/.run/publish.txt /work/.run/orphans.txt
 task: [list] mkdir -p /work/.run /work/staging
 task: [retry] for i in 1 2 3 4 5; do
@@ -126,6 +147,9 @@ task: [push] xz -T0 -c /work/.run/applied.new > /work/.run/applied.new.xz
 task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/applied.new.xz s3://ctan/.state/applied.txt.xz
 task: [checkpoint] mv /work/.run/applied.new /work/.run/applied.txt
 task: [checkpoint] find /work/staging -mindepth 1 -delete
+task: [reconciled] cp /work/.run/start.txt /work/.run/reconciled
+task: [push] xz -T0 -c /work/.run/reconciled > /work/.run/reconciled.xz
+task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 /work/.run/reconciled.xz s3://ctan/.state/reconciled
 task: [pull] rc=0; aws s3 ls s3://ctan/.state/indexed.txt.xz > /dev/null || rc=$?
 case $rc in
   0) aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout 300 s3://ctan/.state/indexed.txt.xz /work/.run/indexed.txt.xz && xz -dc /work/.run/indexed.txt.xz > /work/.run/indexed.txt ;;

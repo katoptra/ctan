@@ -68,11 +68,10 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
 - **`checkpoint` is the last step of a batch.** The state is written once per batch, after
   the upload succeeded, as one PutObject. A run that dies anywhere repeats at most one batch
   the next hour. A run that stops at `MAX_BATCHES` with batches left is a success.
-- **The hour a run belongs to is the hour it started.** `clock` writes `epoch UTC-hour weekday`
-  to `.run/start.txt` at the top of the run, `report` prints the start time from the epoch, and
-  `reconcile` keys `auto` on that hour being 03 -- read at the start because `reconcile` runs
-  late enough that a long run would have crossed into the next hour by then. A run queued
-  behind a longer one can start in 04 and skip the day's reconcile; the next day's does it.
+- **`reconcile` is due by age, never by the hour.** lib's `due` reconciles the run that
+  starts 24 h, less half an hour, after the last reconcile started (`.state/reconciled`), so
+  the hour it lands in drifts with the runs and a moved schedule changes nothing. A run
+  that fails before its reconcile completes records nothing, and the next run is due.
 - **Four Cloudflare defaults must stay off for the mirror.** One zone Configuration Rule
   turns all four off for the mirror's hostname alone, and `docs/reference.md` section 6 has
   each with its expression. Three of them alter `text/html` in flight, so the bytes stop
