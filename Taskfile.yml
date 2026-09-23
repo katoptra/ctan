@@ -25,8 +25,8 @@ env:
 
 # Two includes, one namespace. A verb both an include and this file define is a parse
 # error unless the include excludes it: the report hooks, and the two engine hooks this
-# mirror fills. MAX_BATCHES, BATCH_GB and RECONCILE are the engine's inline defaults, so
-# a run sets them: task sync -- MAX_BATCHES=8 RECONCILE=true.
+# mirror fills. MAX_BATCHES and BATCH_GB are the engine's inline defaults and RECONCILE
+# the toolbox's, so a run sets them: task sync -- MAX_BATCHES=8 RECONCILE=true.
 includes:
   toolbox:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/toolbox.yml
