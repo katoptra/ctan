@@ -51,6 +51,7 @@ task: [push] aws s3 cp --no-progress --cli-connect-timeout 60 --cli-read-timeout
 task: [rebuild] mv /work/.run/applied.new /work/.run/applied.txt
 task: [rebuild] rm -f /work/.run/rebuild-now
 task: [diff] LC_ALL=C comm -13 /work/.run/applied.txt /work/.run/upstream.txt > /work/.run/changed.txt
+task: [diff] awk -F'\t' -v TL="systems/texlive/tlnet" 'NR == FNR { if ($1 ~ "^" TL "/(tlpkg/texlive\\.tlpdb|[^/]+)\\.sha512$") want[substr($1, 1, length($1) - 7)]; next } $1 in want' /work/.run/changed.txt /work/.run/upstream.txt | LC_ALL=C sort -u -o /work/.run/changed.txt - /work/.run/changed.txt
 task: [diff] cut -f1 /work/.run/upstream.txt > /work/.run/paths.txt
 task: [diff] cut -f1 /work/.run/applied.txt | LC_ALL=C comm -23 - /work/.run/paths.txt > /work/.run/deleted.txt
 task: [split] awk -F'\t' -v gb=200 '{ s += $2 }
