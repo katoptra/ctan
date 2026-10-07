@@ -7,22 +7,21 @@ mirrors share; `docs/reference.md` holds the numbers, the runbook and the zone r
 This file is what a change must not break.
 
 Nothing in this repo starts a run: an external scheduler dispatches `sync.yml` hourly at
-:42. `Taskfile.yml` and its comments are the design of what is this mirror's own: the
-identity in root vars, `pages` and `index` (the directory pages), `smoke-mirror`,
-`report-mirror` and `offline`. `aws.config` sets single-part uploads under 4 GiB and
-512 MiB multipart parts above. `fixtures/run-root` is the canned hour `offline` reads.
+:42. `Taskfile.yml` holds what is this mirror's own: the identity in root vars, the
+closing line of the directory pages (`PAGE_FOOT`) and the HTML canary (`CANARY`). Every
+verb is lib's. `aws.config` sets single-part uploads under 4 GiB and 512 MiB multipart
+parts above.
 
 ## Constraints
 
 - No shell scripts. Logic lives in `Taskfile.yml` and, for everything shared with the
   other mirrors, in lib; a change to how bytes move goes to the engine, where every mirror
   gets it. Extension is a hook, never a copy: `smoke-mirror`, not a second `smoke`.
-- Excludes are `report-engine` and `report-mirror` on the toolbox include, `index` and
-  `smoke-mirror` on the engine's. Never redefine a lib var. Inside an engine verb a root
-  var shadows a command-line `KEY=value`, so `MAX_BATCHES`, `BATCH_GB` and `RECONCILE` stay
-  out of the root vars and a run sets them: `task sync -- MAX_BATCHES=8`. A root var cannot
-  read an include's var either, so `SLASH` is a task-level var of `pages` and `index`.
-- The zone is configured by hand; nothing here calls the Cloudflare API.
+- The one exclude is `report-engine`, on the toolbox include. Never redefine a lib var.
+  Inside an engine verb a root var shadows a command-line `KEY=value`, so `MAX_BATCHES`,
+  `BATCH_GB` and `RECONCILE` stay out of the root vars and a run sets them:
+  `task sync -- MAX_BATCHES=8`.
+- The zone's rules live outside this repository; nothing here calls the Cloudflare API.
 - Objects sit at the bucket root under CTAN's own paths. `.state/` is the one reserved
   prefix; CTAN has no dot-prefixed root entry, so it cannot collide.
   `<HOST>.directory.index.html` is the one reserved file name: the page `index` draws in every
@@ -59,7 +58,7 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
   all) go in the final batch, after every container, and `verify` refuses that batch unless
   every container the tlpdb names is in the bucket after this run. `delete` waits for the
   hour in which every batch has landed, so the live tlpdb never names a removed container.
-  `smoke` names `/timestamp` twice and asks for it only when the state records it: a first
+  `smoke` names `/timestamp` and asks for it only when the state records it: a first
   fill capped at `MAX_BATCHES` has not reached the decision batch, and the bucket answers 404
   to a key it has never held.
 - **Never `aws s3 sync`.** `publish` is `aws s3 cp --recursive` (one PutObject per file,
@@ -82,7 +81,7 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
   whitespace in the tag it touched, which is why `smoke`'s canary compares the R2 object with
   the response rather than their lengths. The fourth, Browser Integrity Check, answers 403 to
   `libwww-perl`, `LWP`, `Python-urllib` and `PycURL`, all of which every other CTAN mirror
-  serves; `smoke` asks for `/timestamp` as `libwww-perl` to catch it coming back. Cloudflare
+  serves; `smoke` reads `CANARY` as `libwww-perl` to catch it coming back. Cloudflare
   also sends no `content-length` on `text/html` whatever these are set to, which is why
   `smoke` sizes an object from a one-byte ranged read and not a HEAD.
 - **`index.html` at the root is CTAN's**, stored and served like every other file; the
@@ -90,14 +89,14 @@ Each of these is a bug that has happened or a bill that would. Do not undo them.
   URL to that directory's page. `README.md` is the documentation; there is no landing page
   of our own.
 - **Directory pages are drawn from the state, never from upstream.** R2 has no listings, so
-  `index` writes `<dir>/<HOST>.directory.index.html` for every directory a run changed, from
-  `applied.txt` (what the bucket holds), and `.state/indexed.txt.xz` records the state the
-  pages last showed, so a run that dies before advancing it redraws the same pages next
-  hour. No page enters the state (`merge` joins staging against the batch) and `reconcile`
-  never counts one as an orphan. A missing `indexed` redraws all 27k once, which is also the
-  only way a change to the page's markup reaches pages whose directory has not changed. The
-  zone's second transform rule serves `/dir/` from that key; without it the pages exist and
-  nothing else changes.
+  the engine's `index` writes `<dir>/<HOST>.directory.index.html` for every directory a run
+  changed, from `applied.txt` (what the bucket holds), and `.state/indexed.txt.xz` records
+  the state the pages last showed, so a run that dies before advancing it redraws the same
+  pages next hour. No page enters the state (`merge` joins staging against the batch) and
+  `reconcile` never counts one as an orphan. A missing `indexed` redraws all 27k once, which
+  is also the only way a change to the page's markup reaches pages whose directory has not
+  changed. The zone's second transform rule serves `/dir/` from that key; without it the
+  pages exist and nothing else changes.
 - **Every page is written under both of its keys, and only one of them names itself.**
   `<dir>/<HOST>.directory.index.html` serves `/dir/`; `<dir>` serves `/dir`, where every
   other mirror answers 301 and no Cloudflare rule can, because 13,259 upstream files carry
@@ -127,13 +126,9 @@ Every check runs inside the toolbox image.
 - `task check` renders every command of the pipeline inside the image and diffs it
   against `render.txt`; `task render-update` accepts a change. The `check` workflow does
   the same on every pull request.
-- `task run -- task offline`: the engine's `smoke` (its sample, then this mirror's
-  `smoke-mirror`) and then `pages`, over `fixtures/run-root` copied under `.run`. That
-  hour's one dirty directory is the root, which has no slashless key: it must draw the root
-  page, leave `slash/` empty and remove no key. Over `file://` only the INDEX key is read,
-  because a filesystem cannot hold both `a/b` and `a/b/`. A real listing rendered onto a
-  macOS disk comes out one page short under each key: CTAN has `obsolete/support/TeXshell/`
-  and `texshell/`, which a case-insensitive disk merges. The runner is ext4 and draws both.
+- The directory pages, their read-back and the canary are lib's:
+  `cd ../lib/examples/rsync && task run -- task offline` draws a page set that must match
+  ctan's byte for byte.
 - The engine's verbs, `diff`, `split`, `merge`, `retry` and the signed checks `prepare`
   and `verify`, are checked in lib: `cd ../lib/examples/rsync && task run -- task offline`.
 - `publish`, `checkpoint`, `delete`, `rebuild`, `index` need credentials; a fork tests them
@@ -141,7 +136,7 @@ Every check runs inside the toolbox image.
   `task sync -- MAX_BATCHES=1 BATCH_GB=1`.
 - Is the mirror fresh? `curl -s https://ctan.katoptra.org/timestamp`.
 
-Seven hazards, each of which has cost an evening:
+Six hazards, each of which has cost an evening:
 
 - **A `>-` folded block keeps the newline** when a continuation line is indented further
   than the lines around it, and the rendered shell then splits into two commands. End the
@@ -157,13 +152,6 @@ Seven hazards, each of which has cost an evening:
   writes under `.run/tl` must be guarded on the batch carrying a tlnet path, or it dies on a
   redirect into a directory nobody made -- rare enough to pass every fixture and every CI
   run and still break a live hour.
-- **GNU `xargs` runs its command once on empty input.** A guard on the file feeding the pipe
-  is not a guard on what reaches `xargs`: `pages`'s `SLASH` awk drops the root, which has no
-  slashless key, so an hour whose only dirty directory is the root sends it nothing and it
-  runs `mkdir -p` with no operands. Two ordinary hours are that hour -- one where the delta is
-  root files alone (`timestamp` by itself), and one where a deletion takes the last file under
-  a top-level directory, leaving no dirty directory that still exists. Every `xargs` whose
-  input can be filtered down to nothing takes `-r`.
 - **Only what `op.env` names crosses into the container**, beside `GITHUB_STEP_SUMMARY`,
   `GITHUB_RUN_ID` and `HEALTHCHECK_URL`, which the toolbox always passes. `report` reads
   `GITHUB_STEP_SUMMARY`, whose value is a path on the runner, so the variable is passed *and*
