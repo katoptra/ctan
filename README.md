@@ -49,8 +49,8 @@ completed run, the same file CTAN's mirror monitor reads.
 ## How it works
 
 Once an hour a GitHub Actions job runs this pipeline inside the toolbox image from
-[katoptra/lib](https://github.com/katoptra/lib). Every solid box is a verb of lib's rsync
-engine; the dashed ones are this mirror's own.
+[katoptra/lib](https://github.com/katoptra/lib). Every box is a verb of lib's rsync
+engine; this mirror adds none of its own.
 
 ```mermaid
 flowchart LR
@@ -60,11 +60,6 @@ flowchart LR
     fetch --> verify --> publish --> checkpoint
   end
   batches --> b --> delete --> reconcile --> index --> smoke --> report --> ping
-  index -.-> pages["pages"]
-  smoke -.-> sm["smoke-mirror"]
-  report -.-> rm["report-mirror"]
-  classDef own stroke-dasharray: 5 5
-  class pages,sm,rm,index own
 ```
 
 What this mirror owns, in [`Taskfile.yml`](Taskfile.yml):
@@ -73,15 +68,14 @@ What this mirror owns, in [`Taskfile.yml`](Taskfile.yml):
   `HOST`, `BUCKET`, the signed TeX Live subtree `TL` and its key fingerprint `TL_KEY`, a
   200 GB `CEILING_GB` past which a run refuses to start, and a `LIST_FLOOR` under which
   a listing is taken as truncated rather than as a deletion list.
-- **Directory pages.** R2 serves no listings, so `pages` draws one for every directory the
-  run touched, from the state file rather than from upstream, and `index` uploads each
-  under two keys: `<dir>/ctan.katoptra.org.directory.index.html`, which a zone rule
-  serves for `/dir/`, and the bare `<dir>`, which serves `/dir` where other mirrors would
-  redirect. `docs/reference.md` section 7 has why there are two.
-- **Read-back checks.** After the engine's sample, `smoke-mirror` reads one redrawn page
-  back under both keys, compares one HTML file byte for byte with the bucket's copy (the
-  canary for Cloudflare's HTML rewriters), and asks for `/timestamp` as a Perl client.
-- **Its row of the run summary**, and an `offline` check over `fixtures/`.
+- **Directory pages.** `INDEX` turns on the engine's pages: one for every directory the run
+  touched, drawn from the state and uploaded under two keys,
+  `<dir>/ctan.katoptra.org.directory.index.html` for `/dir/` and the bare `<dir>` for
+  `/dir`. `PAGE_FOOT` links each to the same directory on ctan.org. `docs/reference.md`
+  section 7 has why there are two keys.
+- **The canary.** `CANARY` names an HTML file with plain `http://` links and `mailto:`
+  addresses. After every run the engine reads it through the domain as a Perl client and
+  compares it byte for byte with the bucket's copy.
 
 Everything else, from the list diff and the batching to the signature checks, the state
 file and the daily reconcile, is the engine's and is documented once in
@@ -147,7 +141,6 @@ On a laptop with go-task, the 1Password CLI and Docker or Apple `container`:
 
 ```sh
 task check                # render every command of the pipeline inside the image; diff against render.txt
-task run -- task offline  # the read-back checks and the directory pages, over a canned hour; no network
 task plan                 # the read-only half against your bucket: list, state, diff, split; nothing uploaded
 ```
 
