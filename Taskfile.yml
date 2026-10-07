@@ -24,8 +24,8 @@ env:
   AWS_CONFIG_FILE: '{{.ROOT_DIR}}/aws.config'
 
 # Two includes, one namespace. A verb both an include and this file define is a parse
-# error unless the include excludes it: the report hooks, and the two engine hooks this
-# mirror fills. MAX_BATCHES and BATCH_GB are the engine's inline defaults and RECONCILE
+# error unless the include excludes it: the report hooks, and the engine verbs this mirror
+# defines itself. MAX_BATCHES and BATCH_GB are the engine's inline defaults and RECONCILE
 # the toolbox's, so a run sets them: task sync -- MAX_BATCHES=8 RECONCILE=true.
 includes:
   toolbox:
@@ -44,7 +44,7 @@ includes:
   rsync:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/engines/rsync.yml
     flatten: true
-    excludes: [index, smoke-mirror]
+    excludes: [index, smoke-mirror, pages]
 
 tasks:
   pages:
