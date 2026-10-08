@@ -76,6 +76,9 @@ What this mirror owns, in [`Taskfile.yml`](Taskfile.yml):
 - **The canary.** `CANARY` names an HTML file with plain `http://` links and `mailto:`
   addresses. After every run the engine reads it through the domain as a Perl client and
   compares it byte for byte with the bucket's copy.
+- **Freshness.** `FRESH_KEY` is `timestamp`, where the master writes its clock every hour,
+  and `FRESH_HOURS` is 6. After every run the engine reads it through the domain and fails
+  the run once it is six hours old: the master, or the mirror's view of it, has stopped.
 
 Everything else, from the list diff and the batching to the signature checks, the state
 file and the daily reconcile, is the engine's and is documented once in
