@@ -8,7 +8,9 @@ on:
         default: ''
 permissions:
   contents: read
-  actions: write   # the called workflow chains the next run; a called workflow cannot raise this
+  # The sync workflow of lib uses this permission to start the next run of a chain. Only
+  # this file can set it.
+  actions: write
 concurrency: {group: sync, cancel-in-progress: false}
 jobs:
   sync:
