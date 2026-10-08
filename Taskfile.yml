@@ -16,7 +16,7 @@ vars:
   TL: systems/texlive/tlnet                     # the one signed subtree
   TL_KEY: C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC   # tug.org/texlive/verify.html
   CEILING_GB: 200                               # refuse to run past this many decimal GB upstream
-  LIST_FLOOR: 400000                            # a listing under this many lines is a truncated one; CTAN is ~511k files
+  LIST_FLOOR: 460000                            # a listing under this many lines is a truncated one; CTAN is ~514k files
   INDEX: '{{.HOST}}.directory.index.html'      # the page index draws in every directory; no upstream path can carry the name
   # The line every directory page closes on; %s is the directory's encoded path.
   PAGE_FOOT: '<a href="https://ctan.org/tex-archive/%s">This directory on ctan.org</a>. Sizes in bytes, times as CTAN lists them.'
@@ -24,22 +24,13 @@ vars:
   FRESH_KEY: timestamp                          # the master's clock, written hourly; mirmon reads it too
   FRESH_HOURS: 6                                # an hourly mirror, so six hours old is a stall, not a slow sync
 
-env:
-  AWS_CONFIG_FILE: '{{.ROOT_DIR}}/aws.config'
-
-# Two includes, one namespace. report-engine is both the toolbox's no-op and the engine's,
-# so the toolbox include excludes it. MAX_BATCHES and BATCH_GB are the engine's inline
-# defaults and RECONCILE the toolbox's, so a run sets them: task sync -- MAX_BATCHES=8
-# RECONCILE=true.
 includes:
   toolbox:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/toolbox.yml
     flatten: true
-    excludes: [report-engine]
     vars:
       NAME: ctan
       DESC: an hourly mirror of {{.SOURCE}} at https://{{.HOST}}/
-      IMAGE: ghcr.io/katoptra/toolbox:rsync-v2
   rsync:
     taskfile: https://raw.githubusercontent.com/katoptra/lib/v2/engines/rsync.yml
     flatten: true
