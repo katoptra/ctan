@@ -6,15 +6,15 @@
 # v2, with `flatten: true`. The README of lib gives the items that each one supplies.
 #
 # The items in this file are for this mirror only:
-#   - the values that identify the mirror
+#   - the values that identify the mirror and set its limits
 #   - INDEX and PAGE_FOOT, for the directory pages
 #   - CANARY, a file that the engine reads through the domain to find the HTML rewriters
 #     of the zone
 #   - FRESH_KEY and FRESH_HOURS, for the check of the clock of the master
 #
 # The secrets are the names in op.env. op run gets their values from the vault in
-# 1Password. The values go into the image by name, not on a command line. The AWS CLI
-# uses the three AWS_* values for access to R2.
+# 1Password. Each value goes into the image with its name, not on a command line.
+# The AWS CLI uses the three AWS_* values for access to R2.
 version: '3'
 
 vars:
@@ -23,15 +23,16 @@ vars:
   HOST: ctan.katoptra.org                       # a fork changes this line
   # The name of the bucket. The objects are at its root, with the same paths as in CTAN.
   BUCKET: ctan
-  TL: systems/texlive/tlnet                     # the only signed subtree
+  # The signed TeX Live subtree that the engine examines with TL_KEY.
+  TL: systems/texlive/tlnet
   TL_KEY: C78B82D8C79512F79CC0D7C80D5E5D9106BAB6BC   # tug.org/texlive/verify.html
-  # If upstream has more than this number of decimal GB, the run stops.
+  # If upstream has more than this number of decimal GB, the run stops with an error.
   CEILING_GB: 200
   # A listing with a smaller number of lines than this is a truncated listing. CTAN has
   # approximately 514k files.
   LIST_FLOOR: 460000
-  # The key suffix of the directory pages. It must agree with the Transform Rule of the
-  # zone. The bucket keeps the page, not an upstream file with this name.
+  # INDEX is the key suffix of the directory pages. The Transform Rule of the zone uses only
+  # this name. If an upstream file has this name, the bucket keeps the page, not the file.
   INDEX: '{{.HOST}}.directory.index.html'
   # The HTML at the end of each directory page. %s is the encoded path of the directory.
   PAGE_FOOT: '<a href="https://ctan.org/tex-archive/%s">This directory on ctan.org</a>. Sizes in bytes, times as CTAN lists them.'
@@ -39,8 +40,8 @@ vars:
   CANARY: biblio/bibtex/contrib/german/dinat/dinat-index.html
   # The master writes its clock in this file hourly. mirmon also reads the file.
   FRESH_KEY: timestamp
-  # The mirror is hourly. Thus, if the clock does not change for six hours, upstream or
-  # SOURCE stopped. A slow run does not cause that.
+  # The mirror is hourly. Thus, if the clock in FRESH_KEY is more than six hours before the
+  # check, upstream or SOURCE stopped. A slow run does not cause that.
   FRESH_HOURS: 6
 
 includes:
