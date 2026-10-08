@@ -23,7 +23,7 @@ echo "due: RECONCILE=$r RECONCILE_HOURS=$h, last reconcile $ago: $(test -f /work
 task: [list] rm -f /work/.run/publish.txt /work/.run/labeled.txt /work/.run/orphans.txt /work/.run/unlanded.txt /work/.run/fresh.txt
 task: [list] mkdir -p /work/.run /work/staging
 task: [retry] for i in 1 2 3 4 5; do
-  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -rL --list-only rsync://rsync.dante.ctan.org/CTAN/ > /work/.run/listing.txt ) || rc=$?   # subshell so CMD's exit cannot end the loop; || so Task's errexit cannot
+  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -rL --list-only rsync://rsync.dante.ctan.org/CTAN/ > /work/.run/listing.txt ) || rc=$?   # subshell: an exit in CMD cannot stop the loop. ||: the errexit of Task cannot stop it.
   case $rc in 0|23|24) exit 0;; 5|10|12|30|35) ;; *) exit $rc;; esac
   test $i -lt 5 || break
   s=$((15 * 2 ** i + RANDOM % (2 * 15 + 1))); echo "rsync exit $rc, retry $i in ${s}s" >&2; sleep $s
@@ -35,7 +35,7 @@ task: [normalise] awk '
     size = substr($0, 11, RSTART - 11); gsub(/[ ,]/, "", size)
     print path "\t" size + 0 "\t" mtime }' /work/.run/listing.txt \
 | LC_ALL=C sort > /work/.run/upstream.txt
-task: [normalise] test "$(wc -l < /work/.run/upstream.txt)" -gt 400000
+task: [normalise] test "$(wc -l < /work/.run/upstream.txt)" -gt 460000
 task: [state] mkdir -p /work/.run
 task: [pull] rc=0; aws s3 ls s3://ctan/.state/applied.txt.xz > /dev/null || rc=$?
 case $rc in
@@ -76,7 +76,7 @@ task: [split] awk -F'\t' -v OFS='\t' -v CAP=$((4 * 1000000000)) -v DIR=/work/.ru
 task: [prepare] mkdir -p /work/.run/tl
 task: [prepare] printf '%s\n' tlpkg/texlive.tlpdb.xz tlpkg/texlive.tlpdb.sha512 tlpkg/texlive.tlpdb.sha512.asc tlpkg/gpg/pubring.gpg > /work/.run/tl/files.txt
 task: [retry] for i in 1 2 3 4 5; do
-  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -Lt --files-from=/work/.run/tl/files.txt rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ /work/.run/tl/ ) || rc=$?   # subshell so CMD's exit cannot end the loop; || so Task's errexit cannot
+  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -Lt --files-from=/work/.run/tl/files.txt rsync://rsync.dante.ctan.org/CTAN/systems/texlive/tlnet/ /work/.run/tl/ ) || rc=$?   # subshell: an exit in CMD cannot stop the loop. ||: the errexit of Task cannot stop it.
   case $rc in 0|23|24) exit 0;; 5|10|12|30|35) ;; *) exit $rc;; esac
   test $i -lt 5 || break
   s=$((15 * 2 ** i + RANDOM % (2 * 15 + 1))); echo "rsync exit $rc, retry $i in ${s}s" >&2; sleep $s
@@ -87,7 +87,7 @@ task: [prepare] cd /work/.run/tl/tlpkg && shasum -a 512 -c texlive.tlpdb.sha512 
 task: [fetch] find /work/staging -mindepth 1 -delete
 task: [fetch] cut -f1  > /work/.run/files.txt
 task: [retry] for i in 1 2 3 4 5; do
-  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -Lt --files-from=/work/.run/files.txt --ignore-missing-args rsync://rsync.dante.ctan.org/CTAN/ /work/staging/ ) || rc=$?   # subshell so CMD's exit cannot end the loop; || so Task's errexit cannot
+  rc=0; ( rsync --timeout=300 --contimeout=60 --no-h -Lt --files-from=/work/.run/files.txt --ignore-missing-args rsync://rsync.dante.ctan.org/CTAN/ /work/staging/ ) || rc=$?   # subshell: an exit in CMD cannot stop the loop. ||: the errexit of Task cannot stop it.
   case $rc in 0|23|24) exit 0;; 5|10|12|30|35) ;; *) exit $rc;; esac
   test $i -lt 5 || break
   s=$((15 * 2 ** i + RANDOM % (2 * 15 + 1))); echo "rsync exit $rc, retry $i in ${s}s" >&2; sleep $s
@@ -310,7 +310,7 @@ function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = s
   tolower($1) == "content-length:" { c = $2 }
   $2 == "416" { z = 1 }
   END { sub(/\r/, "", r); sub(/\r/, "", c); print (r != "" ? r : (z ? 0 : c)) }'); ct=$(printf '%s\n' "$h" | awk 'tolower($1) == "content-type:" { sub(/\r$/, ""); print $2 }'); echo "$k: $got bytes (listing: $want), served as ${ct:-no type} (label: ${t:-none})"; test "$got" = "$want" || exit 1; case "https://ctan.katoptra.org" in http*) test -z "$t" || test "$ct" = "$t" || exit 1 ;; esac; done
-task: [smoke] test ! -f /work/.run/tl/tlpkg/texlive.tlpdb.sha512 || test "$(ls /work/.run/batch-*.txt 2>/dev/null | wc -l)" -gt 4 || curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 https://ctan.katoptra.org/systems/texlive/tlnet/tlpkg/texlive.tlpdb.sha512 | cmp - /work/.run/tl/tlpkg/texlive.tlpdb.sha512
+task: [smoke] test ! -f /work/.run/tl/tlpkg/texlive.tlpdb.sha512 || test -f /work/.run/chain || curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 https://ctan.katoptra.org/systems/texlive/tlnet/tlpkg/texlive.tlpdb.sha512 | cmp - /work/.run/tl/tlpkg/texlive.tlpdb.sha512
 task: [smoke] test ! -s /work/.run/index-make.txt || { d=$(tail -1 /work/.run/index-make.txt); want=$(wc -c < "/work/staging/${d}ctan.katoptra.org.directory.index.html" | tr -d ' '); test -n "$want"; case "https://ctan.katoptra.org" in http*) b=1 ;; *) b=0 ;; esac; printf '%s\n' "$d" | awk -v i="ctan.katoptra.org.directory.index.html" -v b="$b" '{ print $0 i } b == 1 && $0 != "" { print substr($0, 1, length($0) - 1) }' | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
 function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = substr(s, j, 1)
     out = out ((c ~ /[A-Za-z0-9\/._~-]/) ? c : sprintf("%%%02X", ord[c])) } return out } { print $0 "\t" enc($0) }' | while IFS="$(printf '\t')" read -r k u; do got=$(curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 -r 0-0 -D - -o /dev/null "https://ctan.katoptra.org/$u" | awk 'tolower($1) == "content-range:" { split($3, a, "/"); r = a[2] }
@@ -321,7 +321,7 @@ task: [smoke] h=biblio/bibtex/contrib/german/dinat/dinat-index.html; n=$(awk -F'
 task: [smoke] g=$(awk -F'\t' '$1 ~ /\.tar\.gz$/ && $2 > 0 { print $1; exit }' /work/.run/applied.txt 2>/dev/null); case "https://ctan.katoptra.org" in http*) ;; *) g= ;; esac; if test -z "$g"; then echo "content-encoding check skipped (no non-empty .tar.gz in the state, or the URL is not http)"; else u=$(printf '%s\n' "$g" | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
 function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = substr(s, j, 1)
     out = out ((c ~ /[A-Za-z0-9\/._~-]/) ? c : sprintf("%%%02X", ord[c])) } return out } { print $0 "\t" enc($0) }' | cut -f2) && h=$(curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 -r 0-0 -D - -o /dev/null "https://ctan.katoptra.org/$u") && if printf '%s' "$h" | grep -qi '^content-encoding:'; then echo "$g: served with a content-encoding" >&2; exit 1; fi && echo "$g: served with no content-encoding"; fi
-task: [smoke] if test -f /work/.run/changed.txt && test "$(ls /work/.run/batch-*.txt 2>/dev/null | wc -l)" -le 4; then LC_ALL=C comm -23 /work/.run/changed.txt /work/.run/applied.txt > /work/.run/unlanded.txt; else : > /work/.run/unlanded.txt; fi; cut -f1 /work/.run/unlanded.txt | head -20 | while IFS= read -r p; do echo "::warning::listed upstream, never fetched: $p"; done
+task: [smoke] if test -f /work/.run/changed.txt && test ! -f /work/.run/chain; then LC_ALL=C comm -23 /work/.run/changed.txt /work/.run/applied.txt > /work/.run/unlanded.txt; else : > /work/.run/unlanded.txt; fi; cut -f1 /work/.run/unlanded.txt | head -20 | while IFS= read -r p; do echo "::warning::listed upstream, never fetched: $p"; done
 task: [fresh] k=timestamp; if ! awk -F'\t' -v k="$k" '$1 == k { f = 1 } END { exit !f }' /work/.run/applied.txt 2>/dev/null; then echo "freshness skipped ($k is not in the state)"; else case "6" in ''|*[!0-9]*) echo "FRESH_HOURS is a whole number" >&2; exit 1 ;; esac; u=$(printf '%s\n' "$k" | awk 'BEGIN { for (i = 0; i < 256; i++) ord[sprintf("%c", i)] = i }
 function enc(s,  out, j, c) { out = ""; for (j = 1; j <= length(s); j++) { c = substr(s, j, 1)
     out = out ((c ~ /[A-Za-z0-9\/._~-]/) ? c : sprintf("%%%02X", ord[c])) } return out } { print $0 "\t" enc($0) }' | cut -f2); t=$(curl -fsS --connect-timeout 15 --max-time 60 --retry 6 --retry-connrefused --retry-max-time 600 "https://ctan.katoptra.org/$u" | awk '!/^#/ { for (i = 1; i <= NF; i++) {

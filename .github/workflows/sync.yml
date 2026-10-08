@@ -8,10 +8,12 @@ on:
         default: ''
 permissions:
   contents: read
-  actions: write   # the called workflow chains the next run; a called workflow cannot raise this
+  # The sync workflow of lib uses this permission to start the next run of a chain. Only
+  # this file can set it.
+  actions: write
 concurrency: {group: sync, cancel-in-progress: false}
 jobs:
   sync:
-    uses: katoptra/lib/.github/workflows/sync.yml@fe8162386f612ddb4e5c886632fa7a8d74c54d9f # v2.2.0
+    uses: katoptra/lib/.github/workflows/sync.yml@36d75e6b21473400b5b15003025d9a2e81d4eeea # v2.6.0
     with: {vars: '${{ inputs.vars }}'}
     secrets: inherit
