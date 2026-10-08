@@ -18,7 +18,7 @@
 </p>
 
 This repository is an hourly mirror of all of [CTAN](https://ctan.org) on Cloudflare R2. The
-mirror serves each CTAN path at the root of `https://ctan.katoptra.org/`. It holds
+mirror serves each CTAN path at the root of `https://ctan.katoptra.org/`. It contains
 approximately 514,000 files and 140 GB. A list diff copies them from the master of CTAN.
 Each hour, a run gets the listing of upstream and compares it with the files in the bucket.
 Then the run moves only the difference.
@@ -29,7 +29,7 @@ Actions jobs, and an external scheduler starts them.
 ## How to use
 
 TeX Live and TinyTeX use `tlmgr`. To use this mirror, set it as the repository of `tlmgr`.
-Then update:
+Then update TeX Live:
 
 ```sh
 tlmgr option repository https://ctan.katoptra.org/systems/texlive/tlnet/
@@ -42,7 +42,7 @@ For a new installation, give the same URL to the installer:
 install-tl -repository https://ctan.katoptra.org/systems/texlive/tlnet/
 ```
 
-A directory URL shows the files that the mirror holds in that directory, for example
+A directory URL shows the files that the mirror contains in that directory, for example
 `https://ctan.katoptra.org/systems/knuth/`. The root serves the index page of CTAN.
 
 To use the mirror rotation of CTAN again, run `tlmgr option repository ctan`.
@@ -72,24 +72,26 @@ flowchart LR
 
 This mirror sets these root vars in [`Taskfile.yml`](Taskfile.yml):
 
-- **`SOURCE`** is the master of CTAN, `rsync.dante.ctan.org`. **`HOST`** and **`BUCKET`** are
-  the domain and the bucket of the mirror.
+- **`SOURCE`** is the master of CTAN, `rsync.dante.ctan.org` (dante). **`HOST`** and
+  **`BUCKET`** are the domain and the bucket of the mirror.
 - **`TL`** is the signed TeX Live subtree, `systems/texlive/tlnet`. **`TL_KEY`** is the
-  fingerprint of the TeX Live primary key. The engine examines the SHA-512 checksum and the
-  GPG signature of `texlive.tlpdb`, and of each installer and updater at the root of `TL`,
-  `update-tlmgr-latest` too.
-  On CTAN, only these files have a signature that the mirror can pin. The mirror copies all
-  other files on CTAN byte for byte, tlcontrib and the TeX Live ISO images too.
+  fingerprint of the primary key of TeX Live. The engine examines the SHA-512 checksum and
+  the GPG signature of `texlive.tlpdb`. It also examines each installer and each updater at
+  the root of `TL`, for example `update-tlmgr-latest`. On CTAN, only these files have a
+  signature that the mirror can pin. The mirror copies each other file on CTAN byte for
+  byte, with tlcontrib and the ISO images of TeX Live.
 - **`CEILING_GB`** is 200. If upstream is more than 200 GB, a run does not start.
-- **`LIST_FLOOR`** is 460,000, approximately 90% of a listing of CTAN. A listing with fewer
-  lines stops the run, because a truncated listing must not become a list of deletions.
-- **`INDEX`** is `ctan.katoptra.org.directory.index.html`. With it, the engine makes a page
-  for each directory, at two keys: `<dir>/ctan.katoptra.org.directory.index.html` for
-  `/dir/`, and `<dir>` for `/dir`. **`PAGE_FOOT`** puts a link to the same directory on
-  ctan.org at the end of each page. `docs/reference.md` section 7 tells why there are two
-  keys.
+- **`LIST_FLOOR`** is 460,000, approximately 90% of a listing of CTAN. A listing with less
+  than 460,000 lines stops the run, because a truncated listing must not become a list of
+  deletions.
+- **`INDEX`** is `<HOST>.directory.index.html`, thus `ctan.katoptra.org.directory.index.html`
+  for this mirror. With it, the engine makes a page for each directory, at two keys:
+  `<dir>/ctan.katoptra.org.directory.index.html` for `/dir/`, and `<dir>` for `/dir`.
+  **`PAGE_FOOT`** puts a link to the same directory on ctan.org at the end of each page.
+  `docs/reference.md` section 7 gives the cause of the two keys.
 - **`CANARY`** is `biblio/bibtex/contrib/german/dinat/dinat-index.html`. This HTML file has
-  plain `http://` links and `mailto:` addresses, which the HTML rewriters of the zone change.
+  `http://` links (not `https://`) and `mailto:` addresses, which the HTML rewriters of the
+  zone change.
   The canary also finds a zone that rejects a Perl client.
 - **`FRESH_KEY`** is `timestamp`, in which the master writes its clock each hour.
   **`FRESH_HOURS`** is 6. The mirror is hourly. Thus, if the clock does not change for six
@@ -132,10 +134,11 @@ approximately $2.10 a month, at $0.015 for each GB-month.
 | An API token with Object Read & Write, for that bucket only | The three `AWS_*` values in step 3 |
 | A custom domain on the bucket, which is `HOST` | The clients and the read-back checks fetch from it |
 
-The rsync image of lib has an `aws.config` at `/etc/aws.config`. It sends each file smaller
-than 4 GiB as one PutObject. It sends the five larger CTAN files in parts of 512 MiB.
-[lib, Storage](https://github.com/katoptra/lib#storage) tells how the engine uses a bucket and
-what `.state/` holds. It also tells why the state is only a cache of the bucket.
+The rsync image of lib has an `aws.config` at `/etc/aws.config`. This file makes the AWS CLI
+send each file smaller than 4 GiB as one PutObject. The CLI sends the five larger CTAN files
+in parts of 512 MiB. [lib, Storage](https://github.com/katoptra/lib#storage) tells how the
+engine uses a bucket, and it gives the contents of `.state/`. It also tells you that the state
+is only a cache of the bucket, and it gives the cause.
 
 ### 3. Secrets
 
@@ -159,7 +162,7 @@ No other configuration on GitHub is necessary.
 [lib, Secrets](https://github.com/katoptra/lib#secrets) tells you:
 
 - How to find the UUID of a vault
-- Why the references use a UUID and not a name
+- The cause for a UUID in the references, and not a name
 - How to use repository secrets as an alternative.
 
 ### 4. The zone
@@ -178,28 +181,29 @@ measurement for it.
 
 ### 5. Do the checks, run it, schedule it
 
-On a laptop with go-task, the 1Password CLI and Docker or Apple `container`, do the check:
+1. On a laptop with go-task, the 1Password CLI, and Docker or Apple `container`, run this
+   command:
 
-```sh
-task check                # render every command of the pipeline inside the image; diff against render.txt
-```
+   ```sh
+   task check                # render each command of the pipeline in the image, then compare it with render.txt
+   ```
 
-Then start the workflow on GitHub: Actions, sync, Run workflow.
+2. Before the first run, pause the healthchecks.io check. If you do not, the check sends an
+   alert, because the first fill is longer than the grace.
+3. In Actions, select the sync workflow.
+4. Click **Run workflow**.
 
 The first run finds an empty bucket. Thus, the delta is the full tree. Each run does four
 batches of the delta and then starts the next run. This continues until all batches are
 done. The first fill copies approximately 140 GB from CTAN, in a chain of runs. After the
-first fill, each run moves the delta of one hour, usually a few dozen files.
+first fill, each run moves the delta of one hour, usually a small number of files.
 
-Pause the healthcheck before the first run. The first fill continues for more hours than the
-grace.
-
-Nothing in this repository starts a run on a schedule. To start runs, do one of these steps:
+No file in this repository starts a run on a schedule. To start runs, do one of these steps:
 
 - Add a `schedule:` trigger to `.github/workflows/sync.yml`, with a minute that you select.
 - Dispatch the workflow from an external scheduler, the same as this mirror.
 
-CTAN tells each mirror to get the changes one time each hour, at a fixed minute.
+CTAN tells each mirror to get the changes one time each hour, at the same minute.
 
 ## Operating it
 
@@ -207,24 +211,24 @@ CTAN tells each mirror to get the changes one time each hour, at a fixed minute.
 (`--`). The `vars` input of the workflow accepts the same flags:
 
 ```sh
-task sync                                   # one run, the same thing Actions runs
-task sync -- MAX_BATCHES=8                  # more of a backlog in one run
-task sync -- RECONCILE=true                 # rebuild the state from the bucket and sweep orphans now
-gh workflow run sync.yml                    # one run in Actions
-gh workflow run sync.yml -f vars='RECONCILE=true'
+task sync                                          # one run, the same as a run in Actions
+task sync -- MAX_BATCHES=8                         # more batches in one run
+task sync -- RECONCILE=true                        # a reconcile in this run: make the state again from the bucket, and delete orphans
+gh workflow run sync.yml                           # one run in Actions
+gh workflow run sync.yml -f vars='RECONCILE=true'  # a run in Actions, with a reconcile
 ```
 
 Each run adds one table to its job page. The table shows these items:
 
-- When the run started, and the time that it used
+- When the run started, and how many minutes it continued
 - The delta, and the files that the run uploaded
 - The state and the storage
 - The signature check
 - The directory pages that the run made again
 - The clock in `timestamp`, and its limit of 6 h.
 
-A missing ping is the only alert. If a slot gets no ping, healthchecks.io sends an email when
-the grace ends. The entries that follow are for two conditions:
+A failed run is the only alert. If a slot gets no ping in the time of the grace,
+healthchecks.io sends an email. The entries that follow are for two conditions:
 
 - **The time in `timestamp` did not change for six hours.** This shows that dante does not
   update. Examine mirmon and dante. No change in this repository is necessary. For the other
@@ -248,8 +252,8 @@ entry for each of these conditions:
 
 ## Reference
 
-[`docs/reference.md`](docs/reference.md) holds the numbers of the mirror. Each number has the
-date of its check:
+[`docs/reference.md`](docs/reference.md) contains the numbers of the mirror. Each number has
+the date of its check:
 
 1. **Baseline**: the measured tree, the files that change each month, and the hours with the
    most changes
