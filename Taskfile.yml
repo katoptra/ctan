@@ -21,6 +21,8 @@ vars:
   # The line every directory page closes on; %s is the directory's encoded path.
   PAGE_FOOT: '<a href="https://ctan.org/tex-archive/%s">This directory on ctan.org</a>. Sizes in bytes, times as CTAN lists them.'
   CANARY: biblio/bibtex/contrib/german/dinat/dinat-index.html   # 8 plain http:// links and 3 mailto: addresses
+  FRESH_KEY: timestamp                          # the master's clock, written hourly; mirmon reads it too
+  FRESH_HOURS: 6                                # an hourly mirror, so six hours old is a stall, not a slow sync
 
 env:
   AWS_CONFIG_FILE: '{{.ROOT_DIR}}/aws.config'
