@@ -169,7 +169,7 @@ the date of the check:
 you use to the next full unit, and the unit for operations is one million. Thus, if the Class A
 operations are one operation more than the free tier, the cost is $4.50.
 
-The free tier is for each account, and the six buckets of katoptra are in one account
+The free tier is for each account, not for each bucket
 ([lib, R2 specifics](https://github.com/katoptra/lib#r2-specifics)). The storage costs in this
 section are gross: they do not subtract the free tier. In the costs of operations, this bucket
 gets all of the free tier. Thus, these costs are a minimum.
