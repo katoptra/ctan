@@ -45,7 +45,7 @@ install-tl -repository https://ctan.katoptra.org/systems/texlive/tlnet/
 A directory URL shows the files that the mirror contains in that directory, for example
 `https://ctan.katoptra.org/systems/knuth/`. The root serves the index page of CTAN.
 
-To use the mirror rotation of CTAN again, run `tlmgr option repository ctan`.
+To let CTAN select a mirror again, run `tlmgr option repository ctan`.
 
 Is it fresh? The master of CTAN writes its clock to `timestamp` each hour. The mirror copies
 `timestamp` the same as each other file, and the mirror monitor of CTAN reads it:
@@ -81,11 +81,12 @@ This mirror sets these root vars in [`Taskfile.yml`](Taskfile.yml):
   signature that the mirror can pin. The mirror copies each other file on CTAN byte for
   byte, with tlcontrib and the ISO images of TeX Live.
 - **`CEILING_GB`** is 200. If upstream is more than 200 GB, a run does not start.
-- **`LIST_FLOOR`** is 460,000, approximately 90% of a listing of CTAN. A listing with less
-  than 460,000 lines stops the run, because a truncated listing must not become a list of
-  deletions.
-- **`INDEX`** is `<HOST>.directory.index.html`, thus `ctan.katoptra.org.directory.index.html`
-  for this mirror. With it, the engine makes a page for each directory, at two keys:
+- **`LIST_FLOOR`** is 460,000, approximately 90% of a listing of CTAN. A listing that does not
+  have more than 460,000 lines stops the run, because a truncated listing must not become a
+  list of deletions.
+- **`INDEX`** is `<HOST>.directory.index.html`. For this mirror, it is
+  `ctan.katoptra.org.directory.index.html`. With it, the engine makes a page for each
+  directory, at two keys:
   `<dir>/ctan.katoptra.org.directory.index.html` for `/dir/`, and `<dir>` for `/dir`.
   **`PAGE_FOOT`** puts a link to the same directory on ctan.org at the end of each page.
   `docs/reference.md` section 7 gives the cause of the two keys.
@@ -137,8 +138,8 @@ approximately $2.10 a month, at $0.015 for each GB-month.
 The rsync image of lib has an `aws.config` at `/etc/aws.config`. This file makes the AWS CLI
 send each file smaller than 4 GiB as one PutObject. The CLI sends the five larger CTAN files
 in parts of 512 MiB. [lib, Storage](https://github.com/katoptra/lib#storage) tells how the
-engine uses a bucket, and it gives the contents of `.state/`. It also tells you that the state
-is only a cache of the bucket, and it gives the cause.
+engine uses a bucket, and it gives the contents of `.state/`. It also gives the cause for a
+state that is only a cache of the bucket.
 
 ### 3. Secrets
 
@@ -188,8 +189,8 @@ measurement for it.
    task check                # render each command of the pipeline in the image, then compare it with render.txt
    ```
 
-2. Before the first run, pause the healthchecks.io check. If you do not, the check sends an
-   alert, because the first fill is longer than the grace.
+2. Before the first run, pause the healthchecks.io check. If you do not pause the check, it
+   sends an alert, because the first fill is longer than the grace.
 3. In Actions, select the sync workflow.
 4. Click **Run workflow**.
 
@@ -198,7 +199,7 @@ batches of the delta and then starts the next run. This continues until all batc
 done. The first fill copies approximately 140 GB from CTAN, in a chain of runs. After the
 first fill, each run moves the delta of one hour, usually a small number of files.
 
-No file in this repository starts a run on a schedule. To start runs, do one of these steps:
+No file in this repository schedules a run. To start runs, do one of these steps:
 
 - Add a `schedule:` trigger to `.github/workflows/sync.yml`, with a minute that you select.
 - Dispatch the workflow from an external scheduler, the same as this mirror.
@@ -207,8 +208,8 @@ CTAN tells each mirror to get the changes one time each hour, at the same minute
 
 ## Operating it
 
-`task` with no task name prints the menu. Give the flags of a run after the double dash
-(`--`). The `vars` input of the workflow accepts the same flags:
+`task` with no task name prints the menu. Put the flags of a run after `--`. Put the same flags
+in the `vars` input of the workflow:
 
 ```sh
 task sync                                          # one run, the same as a run in Actions

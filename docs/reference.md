@@ -98,16 +98,16 @@ uses, and the cause for each rule.
 | Runner RAM | 16 GB | Less than 300 MB |
 | Jobs at the same time | 20 on the Free plan | 1. With `concurrency: sync`, a run for the next slot waits until the run before it stops. |
 | Job summary | 1 MiB for each step, 20 steps | Approximately 2 KB |
-| Runs that wait | One run waits for each `concurrency` group. GitHub cancels the others. | A run that the scheduler starts during a run waits. The delta of the next hour includes the work of a run that GitHub cancels. |
+| Runs that wait | One run waits for each `concurrency` group. GitHub cancels the other runs. | A run that the scheduler starts during a run waits. The delta of the next hour includes the work of a run that GitHub cancels. |
 
-The documentation gives no limit for the quantity of the log, and GitHub removes log lines
-without a message. Thus, `report` counts from `.run/`, and not from the log.
+The documentation gives no limit for the quantity of the log. GitHub removes log lines, and
+it does not tell you. Thus, `report` counts from `.run/`, and not from the log.
 
 No cache keeps the toolbox image, `ghcr.io/katoptra/toolbox:rsync-v2`, between jobs. Each job
 pulls it from GHCR one time, before the pipeline. Each `task run` of that job then uses that
 image. [lib, The toolbox](https://github.com/katoptra/lib#the-toolbox) tells how the `image`
-verb does this. The README of lib also tells you that no cache is necessary, and it gives the
-cause.
+verb does this. The README of lib also gives the cause for no cache of the image between
+jobs.
 
 ### Registries
 
@@ -157,7 +157,7 @@ last four days.
 
 ## 3. Cost
 
-The prices are from [R2 pricing](https://developers.cloudflare.com/r2/pricing/), on 2026-08-26,
+The costs are from [R2 pricing](https://developers.cloudflare.com/r2/pricing/), on 2026-08-26,
 the date of the check:
 
 - Storage: $0.015 for each GB-month, with 10 GB-month at no cost
@@ -167,7 +167,7 @@ the date of the check:
 
 `DeleteObject` and `AbortMultipartUpload` have no cost. Cloudflare increases the quantity that
 you use to the next full unit, and the unit for operations is one million. Thus, if the Class A
-operations are more than the free tier by one operation, the cost is $4.50.
+operations are one operation more than the free tier, the cost is $4.50.
 
 The free tier is for each account, and the six buckets of katoptra are in one account
 ([lib, R2 specifics](https://github.com/katoptra/lib#r2-specifics)). The storage costs in this
@@ -178,17 +178,17 @@ gets all of the free tier. Thus, these costs are a minimum.
 |---|---|
 | Storage | 139.8 GB-month (0.14 of it is directory pages, each at two keys) × $0.015 = **$2.10 a month** |
 | Storage at the 200 GB ceiling | 200 GB-month × $0.015 = $3.00 a month |
-| Class A operations each month | 30 reconcile listings, 1,440 PutObject calls for the state, the changed files and some thousand directory pages: approximately 45k operations, with no cost. A run that makes all the pages again makes 54.5k operations. |
+| Class A operations each month | Approximately 45k, with no cost. They are 30 reconcile listings, 1,440 PutObject calls for the state, the changed files and some thousand directory pages. A run that makes all the pages again makes 54.5k operations. |
 | Class B operations each month | 720 GET calls for the state, and approximately 5,760 GET calls from `smoke`: approximately 6.5k, thus $0 |
 | One `scheme-full` installation with no cache | 11,919 GETs, 5.51 GB. No cost until 27 installations a day. |
 | Budget | $5 a month. `split` rejects a tree larger than `CEILING_GB` (200) before the run uploads a file. |
 
-At this size, storage is the only item with a cost. The design keeps the Class A operations
+At this size, storage is the only item with a cost. This mirror keeps the Class A operations
 low: only the daily reconcile gets a listing of the bucket. If an hourly sync gets a listing of
 the bucket two times in each run, the cost at 200 GB is $4.50 a month.
 
 We do not know if the storage meter of R2 counts a GB as 10^9 or as 2^30 bytes. This file uses
-10^9, which gives the larger cost. If the meter is binary, the same bucket is 130.2 GB-month,
+10^9, which gives the larger cost. If the meter is binary, the same bucket is 130.2 GiB-month,
 $1.95.
 
 ### Traffic
@@ -238,7 +238,8 @@ cache bypassed. Each total includes the storage, $2.10.
 | 75% | 112.5M | 42.8 | 150 | 103M | $39.18 |
 | 100% | 150.0M | 57.1 | 200 | 140M | $52.50 |
 
-A mirror in the rotation of `mirror.ctan.org` is near the 1% row, and a small quantity more.
+A mirror that `mirror.ctan.org` selects for clients is near the 1% row, and a small quantity
+more.
 The free tier stops at 10M requests a month: 6.7% of the archive, and five times the traffic
 of dotsrc. After that, the rate does not change.
 
@@ -254,9 +255,10 @@ made a model of the cache for the tree of 511,027 objects. The model uses these 
 
 - The requests for the objects agree with Zipf's law.
 - Ten caches in front of the origin. Cloudflare caches in each datacenter. Tiered Cache, at
-  no cost on all plans, puts an upper tier for each region in front of the origin.
-- Poisson arrivals for each object, each cache and each TTL window. A window with one or more
-  requests has the cost of one fill.
+  no cost on all plans, puts a second group of caches, one for each region, in front of the
+  origin.
+- Poisson arrivals for each object, each cache and each TTL window. In a window with one or
+  more requests, the cache fills one time from the origin.
 
 The primary condition of the model is α=0.9 with ten caches. The range of the model is from
 α=0.7 with thirty caches to α=1.1 with ten.
@@ -274,14 +276,14 @@ At 100%, the cost with a 24-hour TTL is from $4.98 to $32.70 in the range of the
 50%, it is from $2.46 to $17.94. At 10% and less, it is not more than $3.18, because the free
 tier is sufficient for all of the range.
 
-With less than 10M requests a month, a cache does not decrease the cost, with all TTLs: the
-free tier is sufficient for all the requests. At 8% of CTAN, a cache first decreases the cost,
-by $0.72 a month. At 20%, it decreases the cost by $6.12. It decreases the cost by $38 only
-with all the requests of the archive. A TTL of one hour does not decrease the cost, with all
-quantities of traffic: in one datacenter, in one hour, no object gets sufficient requests.
+With less than 10M requests a month, a cache does not decrease the cost, with all TTLs. The
+free tier is sufficient for all these requests. At 8% of CTAN, a cache first decreases the
+cost: the cost is $0.72 a month less. At 20%, the cost is $6.12 less. The cost is $38 less only
+with all the requests of the archive.
 
-The seven objects larger than the 512 MB cache limit of Cloudflare are a miss for each request,
-with all TTLs.
+A TTL of one hour does not decrease the cost, with all quantities of traffic. In one
+datacenter, in one hour, no object gets sufficient requests. The seven objects larger than the
+512 MB cache limit of Cloudflare are a miss for each request, with all TTLs.
 
 The cost of a cache is not in dollars. A TTL of more than one hour with no purge has a cost.
 During the full TTL, the cache serves previous copies of `/timestamp` and of the directory
@@ -295,7 +297,7 @@ A purge is the alternative, but it adds these items to the sync path:
 - 30 URLs for each call on the Free plan. The hour with the most changes in the last year
   gives approximately 200 calls, and the directory pages of that hour add more.
 
-At the load of this mirror, a purge decreases the cost by $0.
+At the load of this mirror, a purge does not decrease the cost.
 
 ## 4. Monitoring
 
@@ -307,17 +309,21 @@ has no error. A failed run is the only alert.
 | Schedule | cron `42 * * * *`, time zone UTC, the minute at which the scheduler starts a run |
 | Grace | 3 h |
 | Ping from | `ping`, the last verb of `pipeline` |
-| Configured by | `HEALTHCHECK_URL`, the ping URL of the check, in the `healthcheck` section of the vault item |
+| Set in | `HEALTHCHECK_URL`, the ping URL of the check, in the `healthcheck` section of the vault item |
 
 The three `AWS_*` values are the only necessary values. `HEALTHCHECK_URL` is the fourth value,
 and the only optional one. Without it, the run does not do `ping`, and the mirror has no
 alert.
 
 A run with a full delta of `MAX_BATCHES` batches continues for a maximum of approximately 75
-minutes. The grace of 3 h is sufficient for a run that waits for a previous run, a full run
-after it, and the retries of curl. If the mirror stops, the alert occurs between 3 h and
-4 h 40 min after the last run with no error. That is much less than the 28-hour limit of
-mirmon.
+minutes. The grace of 3 h is sufficient for these items:
+
+- A run that waits for a previous run
+- A full run after it
+- The retries of curl.
+
+If the mirror stops, the alert occurs between 3 h and 4 h 40 min after the last run with no
+error. That is much less than the 28-hour limit of mirmon.
 
 [lib, Monitoring](https://github.com/katoptra/lib#monitoring) tells you:
 
@@ -350,7 +356,7 @@ a summary in the step log tells you that the variable did not go into the contai
 ## 5. Runbook
 
 For a command on a laptop, the 1Password CLI must have a login. `task sync` runs the pipeline
-in `op run`, which resolves `op.env` and gives each value to the image by its name. The image
+in `op run`, which resolves `op.env` and gives each value to the image with its name. The image
 sets `AWS_CONFIG_FILE`. It is safe to run each task again, unless its entry tells you
 differently. A second run writes the same bytes, or it writes no bytes.
 
@@ -392,14 +398,16 @@ while the state was not correct, the mirror does not find the change. It finds t
 upstream changes the file again. This is safe: `rebuild` uploads no CTAN file.
 
 The bucket is the mirror, and the state is a cache of it. If the state is missing, the cost is
-one listing. If the bucket is missing, the cost is the fill in the next entry.
+one listing. If the bucket is missing, the cost is the first fill in the next entry.
 
 **The first fill.** There is no flag for it. An empty bucket gives an empty state, and the
 delta is the full tree. Each run does `MAX_BATCHES` batches (four, or more with
-`-f vars='MAX_BATCHES=8'`). Then it starts the next run, until all batches are done. The fill
-makes approximately 511k Class A operations and copies 140 GB from dante, in a chain of runs.
+`-f vars='MAX_BATCHES=8'`). Then it starts the next run, until all batches are done. The first
+fill makes approximately 511k Class A operations and copies 140 GB from dante, in a chain of
+runs.
 
-Pause the healthchecks.io check before the fill. A run of many hours is longer than the grace.
+Pause the healthchecks.io check before the first fill. A run of many hours is longer than the
+grace.
 
 **Delete one key.**
 
@@ -483,8 +491,8 @@ credentials for the zone. The four rules do not change frequently, and code that
 stop with an error.
 
 This section records the rules. Use it to make the zone again, or to configure the zone of a
-fork, with no new investigation. A zone usually serves more than the mirror, and a path match
-with no hostname is applicable to all of the zone.
+fork, with no new investigation. A zone usually serves more than the mirror, and a rule that
+examines only the path is applicable to all of the zone.
 
 | Where | Rule | Expression | What to set |
 |---|---|---|---|
@@ -500,8 +508,8 @@ bucket, and Cloudflare serves it as 4,216 bytes (measured 2026-08-27). Approxima
 files in the tree are HTML, and a mirror that changes them is not a mirror. Rocket Loader is
 the same risk, from a second switch: it adds a different script.
 
-**Automatic HTTPS Rewrites is the third, and a size check does not find it.** It is on by
-default. It changes `http://` links in HTML to `https://`. On 2026-08-28, the domain served
+**Automatic HTTPS Rewrites is the third, and a size check does not find it.** Its default
+value is on. It changes `http://` links in HTML to `https://`. On 2026-08-28, the domain served
 approximately 5% of the 7,229 HTML files of the tree with bytes that the bucket does not
 contain. That is approximately 360 files, with +1 byte for each changed link.
 
@@ -512,9 +520,9 @@ rewriter, and it was different at byte 7,150. As a result, the canary of `smoke`
 object with the response, and not their lengths. The size checks on the sample of keys cannot
 find it.
 
-**Browser Integrity Check is the fourth: it rejects clients, and it does not change bytes.** It
-is on by default. It sends `403` (Cloudflare error 1010) to each client with a User-Agent that
-contains one of these strings:
+**Browser Integrity Check is the fourth: it rejects clients, and it does not change bytes.**
+Its default value is on. It sends `403` (Cloudflare error 1010) to each client with a
+User-Agent that contains one of these strings:
 
 - `LWP`
 - `libwww-perl`
@@ -540,7 +548,7 @@ filter accepts.
 The rule is applicable only to the hostname of the mirror. The apex and `www` of the zone
 continue to send `403` to `libwww-perl`. This shows that the rule did not become wider.
 
-Cloudflare sends no `content-length` on a `text/html` response, with these four features on or
+Cloudflare sends no `content-length` on a `text/html` response, with these four items on or
 off. Thus, `smoke` gets the size of an object from a ranged GET of one byte, and not from a
 HEAD.
 
@@ -560,8 +568,8 @@ the phase.
 - With less than 10M requests a month, the free tier is sufficient for all requests, and a
   cache does not decrease the cost.
 - A TTL of one hour does not decrease the cost, because Cloudflare caches in each datacenter.
-- A 24-hour TTL first decreases the cost by $0.72, at 12M requests a month. That is six times
-  the traffic of a measured mirror.
+- A 24-hour TTL first decreases the cost at 12M requests a month, six times the traffic of a
+  measured mirror. Then the cost is $0.72 a month less.
 
 A cache also makes a purge of each changed key necessary after each batch. The pipeline does
 not do this purge.
@@ -571,11 +579,11 @@ not do this purge.
 We examined the directory pages on 2026-08-27.
 
 **Only the pipeline can make a listing of a directory.** R2 serves no directory listings, and
-it has no index-document configuration. The documentation of Cloudflare gives this text: the
-domain of a public bucket does "not let you list the bucket contents at the root of your (sub)
-domain". This feature request stayed open for years. The rules engine also cannot make a
-listing: Transform, Redirect, Configuration and Cache rules only change a request or a
-response that is there.
+it has no index-document configuration. The documentation of Cloudflare gives this text about
+the domain of a public bucket. The domain does "not let you list the bucket contents at the
+root of your (sub) domain". This feature request stayed open for years. The rules engine also
+cannot make a listing: Transform, Redirect, Configuration and Cache rules only change a request
+or a response that is there.
 
 Snippets are not possible, because they have these limits:
 
@@ -588,11 +596,11 @@ A Worker with an R2 binding can get a listing of a bucket. But it adds a compute
 of a mirror that has no compute layer. It also adds `wrangler` to a repository with a list of
 tools that does not change.
 
-**For CTAN, a listing is usual on a mirror, but it is not a requirement.** Its
+**For CTAN, a listing is usual on a mirror, but CTAN does not make it necessary.** Its
 [instructions for mirror operators](https://ctan.org/mirrors/register/) tell them to set
 `Options +Indexes` with `DirectoryIndex disabled`. Thus, the server shows its automatic
 listing, and not one of the approximately 111 `index.html` files in the package directories of
-the archive. CTAN has a smaller number of requirements:
+the archive. CTAN makes a smaller number of items necessary:
 
 - HTTPS
 - rsync from `rsync.dante.ctan.org`
@@ -648,11 +656,12 @@ because upstream is a filesystem: a name is a directory or a file. This has thre
   key of a page. In `SLASH/<depth>/`, each page is a file with the same number of
   components. Thus, no page is the parent of a different page, and each tree uploads as one
   unit. The maximum depth in the tree is 14.
-- **The slashless key must have its content type in the upload.** The key has no suffix.
-  Thus, its upload gives `--content-type text/html`. Without the type, the CLI sends
+- **The run must give the content type of the slashless key.** The key has no suffix. Thus,
+  the run uploads it with `--content-type text/html`. Without the type, the CLI sends
   `binary/octet-stream`, and a browser downloads the page and does not show it.
 
-`reconcile` finds the first key by its name, but it cannot find the second key by its name.
+`reconcile` can find the first key from its name, but it cannot find the second key from its
+name.
 Thus, it does not delete a key that is a bare directory of the state. If upstream changes a
 directory to a file, the path is not in that set, and `reconcile` examines it as a usual
 file.

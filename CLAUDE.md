@@ -14,7 +14,7 @@ at HH:42 UTC.
 
 - **Where a change goes.** `Taskfile.yml` has no verbs. Make all changes to verbs in lib: in
   the toolbox or in the rsync engine. Then each mirror that includes that file gets the
-  change. The includes have no `excludes:`.
+  change. Its `includes:` entries have no `excludes:`.
 - **Hooks, not copies.** Do not add shell scripts. To add to a verb, use a hook
   (`smoke-mirror`). Do not make a copy of the verb.
 - **Root vars.** Root vars hold only the values of this mirror. Do not put an engine default
@@ -65,7 +65,7 @@ at HH:42 UTC.
   plus a full run. The check also monitors the scheduler
   ([lib, Monitoring](https://github.com/katoptra/lib#monitoring)). Pause the check before the
   first fill or a large backlog. A run of many hours is longer than the grace.
-- **The edge cache is off, by a zone rule.** There is no purge step. If a cache rule is on, a
+- **A zone rule sets the edge cache to off.** There is no purge step. If a cache rule is on, a
   purge step before `smoke` is necessary. `docs/reference.md` sections 3 and 6 give the
   numbers.
 
