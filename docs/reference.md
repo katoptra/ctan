@@ -306,7 +306,7 @@ has no error. A failed run is the only alert.
 
 | Configuration | Value |
 |---|---|
-| Schedule | cron `42 * * * *`, time zone UTC, the minute at which the scheduler starts a run |
+| Schedule | a cron expression with the same times as the slots of the mirror, time zone UTC |
 | Grace | 3 h |
 | Ping from | `ping`, the last verb of `pipeline` |
 | Set in | `HEALTHCHECK_URL`, the ping URL of the check, in the `healthcheck` section of the vault item |
