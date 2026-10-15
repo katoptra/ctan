@@ -7,8 +7,8 @@ contains the numbers of the mirror, with the runbook and the zone rules. The REA
 [katoptra/lib](https://github.com/katoptra/lib) is the manual for the parts that all the
 mirrors use. This file gives the rules that each change must obey.
 
-Nothing in this repository starts a run. An external scheduler dispatches `sync.yml` hourly,
-at HH:42 UTC.
+Nothing in this repository starts a run. An external scheduler dispatches `sync.yml`. Only
+the scheduler has the times of the runs.
 
 ## Constraints
 
@@ -60,11 +60,12 @@ at HH:42 UTC.
   same as each other file. A Transform Rule rewrites `/` to it, and a second rule rewrites
   each other directory URL to the page of that directory. `README.md` is the documentation.
   katoptra adds no landing page.
-- **A failed run is the only alert.** The healthchecks.io check has the cron `42 * * * *`
-  UTC and a grace of 3 h. The grace is sufficient for a run that waits for a previous run,
-  plus a full run. The check also monitors the scheduler
-  ([lib, Monitoring](https://github.com/katoptra/lib#monitoring)). Pause the check before the
-  first fill or a large backlog. A run of many hours is longer than the grace.
+- **A failed run is the only alert.** The healthchecks.io check has a cron expression with
+  the same times as the slots of the mirror, in UTC, and a grace of 3 h. The grace is
+  sufficient for a run that waits for a previous run, plus a full run. The check also
+  monitors the scheduler ([lib, Monitoring](https://github.com/katoptra/lib#monitoring)).
+  Pause the check before the first fill or a large backlog. A run of many hours is longer
+  than the grace.
 - **A zone rule sets the edge cache to off.** There is no purge step. If a cache rule is on, a
   purge step before `smoke` is necessary. `docs/reference.md` sections 3 and 6 give the
   numbers.
