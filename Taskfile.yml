@@ -31,9 +31,11 @@ vars:
   # A listing with a smaller number of lines than this is a truncated listing. CTAN has
   # approximately 514k files.
   LIST_FLOOR: 460000
-  # INDEX is the key suffix of the directory pages. The Transform Rule of the zone uses only
-  # this name. If an upstream file has this name, the bucket keeps the page, not the file.
-  INDEX: '{{.HOST}}.directory.index.html'
+  # INDEX is the key suffix of the directory pages. The rsync mirrors of katoptra use one
+  # name, and the Transform Rules of the zone use it for their hosts. If an upstream file has
+  # this name, the bucket keeps the page, not the file. The mirror sets no INDEX_FILES: CTAN
+  # asks its mirrors to serve a listing, not an index.html, for each directory.
+  INDEX: katoptra.org.directory.index.html
   # The HTML at the end of each directory page. %s is the encoded path of the directory.
   PAGE_FOOT: '<a href="https://ctan.org/tex-archive/%s">This directory on ctan.org</a>. Sizes in bytes, times as CTAN lists them.'
   # A file with 8 http:// links and 3 mailto: addresses.

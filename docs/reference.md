@@ -434,7 +434,7 @@ the pages in the bucket. If you do not delete the file, the engine makes a page 
 when its directory changes.
 
 **A directory URL gives a 404.** The page is at its key, with or without the zone rules:
-`curl -sI https://ctan.katoptra.org/systems/knuth/ctan.katoptra.org.directory.index.html`. If
+`curl -sI https://ctan.katoptra.org/systems/knuth/katoptra.org.directory.index.html`. If
 this gives 200 and the directory URL does not give 200, examine the second Transform Rule in
 section 6.
 It is missing, or its scope is incorrect.
@@ -484,11 +484,13 @@ does all the work subsequently.
 
 ## 6. Zone configuration
 
-The zone has four Cloudflare rules. Each rule is applicable only to the hostname of the mirror.
-The rules are not part of the pipeline: an operator sets them one time, and the pipeline does
-not change them. The pipeline sends no request to the Cloudflare API, and it has no
-credentials for the zone. The four rules do not change frequently, and code that sets them can
-stop with an error.
+The zone has four Cloudflare rules for the mirror. Each rule is applicable only to the
+hostnames of the mirror, or to the hostnames of the rsync mirrors of katoptra.
+ctan.katoptra.org and tlnet.katoptra.org are two names of this bucket, and they operate
+identically. The rules are not part of the pipeline: an operator sets them one time, and the
+pipeline does not change them. The pipeline sends no request to the Cloudflare API, and it has
+no credentials for the zone. The four rules do not change frequently, and code that sets them
+can stop with an error.
 
 This section records the rules. Use it to make the zone again, or to configure the zone of a
 fork, with no new investigation. A zone usually serves more than the mirror, and a rule that
@@ -496,10 +498,14 @@ examines only the path is applicable to all of the zone.
 
 | Where | Rule | Expression | What to set |
 |---|---|---|---|
-| Configuration Rules | The HTML rewriters and the user-agent filter off | `(http.host eq "ctan.katoptra.org")` | Email Obfuscation off, Rocket Loader off, Automatic HTTPS Rewrites off, Browser Integrity Check off |
-| Cache Rules | The cache off | `(http.host eq "ctan.katoptra.org")` | Cache eligibility: bypass cache |
-| Transform Rules | `/` serves the `index.html` of CTAN | `(http.host eq "ctan.katoptra.org" and http.request.uri.path eq "/")` | Rewrite path to `/index.html` |
-| Transform Rules | Directory URLs serve the page of the mirror | `(http.host eq "ctan.katoptra.org" and ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")` | Rewrite path, dynamic: `concat(http.request.uri.path, http.host, ".directory.index.html")` |
+| Configuration Rules | The HTML rewriters and the user-agent filter off | `(http.host in {<mirror hosts>})` | Email Obfuscation off, Rocket Loader off, Automatic HTTPS Rewrites off, Browser Integrity Check off |
+| Cache Rules | The cache off | `(http.host in {<mirror hosts>})` | Cache eligibility: bypass cache |
+| Transform Rules | `/` serves the `index.html` of CTAN | `(http.host in {"ctan.katoptra.org" "tlnet.katoptra.org"}) and (http.request.uri.path eq "/")` | Rewrite path to `/index.html` |
+| Transform Rules | Directory URLs serve the page of the mirror | `(http.host in {"ctan.katoptra.org" "tlnet.katoptra.org"}) and (ends_with(http.request.uri.path, "/") and http.request.uri.path ne "/")` | Rewrite path, dynamic: `concat(http.request.uri.path, "katoptra.org.directory.index.html")` |
+
+`<mirror hosts>` is the hostnames of the rsync mirrors of katoptra, with ctan.katoptra.org
+and tlnet.katoptra.org. The rewrites do not use `http.host`. Thus, the two names of this
+bucket get the same key for each URL. The two Transform Rules do not match one URL.
 
 **The Configuration Rule is the most important rule.** Email Address Obfuscation changes each
 `text/html` response that Cloudflare serves. It adds a script, encodes the `mailto:` addresses,
@@ -545,7 +551,7 @@ In TeX Live, `TLDownload.pm` sets `agent => "texlive/lwp"`, and its sequence of 
 is `lwp curl wget`. Thus, the first downloader that `tlmgr` uses sends a string that the
 filter accepts.
 
-The rule is applicable only to the hostname of the mirror. The apex and `www` of the zone
+The rule is applicable only to the hostnames of the mirrors. The apex and `www` of the zone
 continue to send `403` to `libwww-perl`. This shows that the rule did not become wider.
 
 Cloudflare sends no `content-length` on a `text/html` response, with these four items on or
