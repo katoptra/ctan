@@ -84,10 +84,11 @@ This mirror sets these root vars in [`Taskfile.yml`](Taskfile.yml):
 - **`LIST_FLOOR`** is 460,000, approximately 90% of a listing of CTAN. A listing that does not
   have more than 460,000 lines stops the run, because a truncated listing must not become a
   list of deletions.
-- **`INDEX`** is `<HOST>.directory.index.html`. For this mirror, it is
-  `ctan.katoptra.org.directory.index.html`. With it, the engine makes a page for each
-  directory, at two keys:
-  `<dir>/ctan.katoptra.org.directory.index.html` for `/dir/`, and `<dir>` for `/dir`.
+- **`INDEX`** is `katoptra.org.directory.index.html`, the page name of the rsync mirrors of
+  katoptra. With it, the engine makes a page for each directory, at two keys:
+  `<dir>/katoptra.org.directory.index.html` for `/dir/`, and `<dir>` for `/dir`. The mirror
+  sets no `INDEX_FILES`. Thus, a directory with an `index.html` also serves the listing, as
+  the CTAN instructions for mirror operators require.
   **`PAGE_FOOT`** puts a link to the same directory on ctan.org at the end of each page.
   `docs/reference.md` section 7 gives the cause of the two keys.
 - **`CANARY`** is `biblio/bibtex/contrib/german/dinat/dinat-index.html`. This HTML file has
@@ -168,17 +169,19 @@ No other configuration on GitHub is necessary.
 
 ### 4. The zone
 
-The zone has four Cloudflare rules. Each rule is applicable only to the hostname of the
-mirror. The rules are not part of the pipeline: you set them one time, and the pipeline does
-not change them. `docs/reference.md` section 6 gives the expression of each rule and the
-measurement for it.
+The zone has four Cloudflare rules for the mirror. Each rule is applicable only to the
+hostnames of the mirror, or to the hostnames of the rsync mirrors of katoptra.
+ctan.katoptra.org and tlnet.katoptra.org are two names of this bucket, and they operate
+identically. The rules are not part of the pipeline: you set them one time, and the pipeline
+does not change them. `docs/reference.md` section 6 gives the expression of each rule and
+the measurement for it.
 
 | Rule | What it does |
 |---|---|
 | Configuration Rule | It sets Email Obfuscation, Rocket Loader, Automatic HTTPS Rewrites and Browser Integrity Check to off. The first three change the HTML while it goes to the client. The fourth sends a 403 to Perl and Python clients. If one of the four operates again, the canary stops the run. |
 | Cache Rule | Bypass. With less than 10M requests a month, a cache does not decrease the cost. A cache also serves a previous copy of `/timestamp`. |
 | Transform Rule | `/` serves the `index.html` of CTAN. |
-| Transform Rule | `/dir/` serves the page of that directory. |
+| Transform Rule | `/dir/` serves the page of that directory, at the key `<dir>/katoptra.org.directory.index.html`. |
 
 ### 5. Do the checks, run it, schedule it
 

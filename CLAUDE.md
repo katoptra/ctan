@@ -26,8 +26,8 @@ the scheduler has the times of the runs.
 - **Paths.** The objects are at the root of the bucket, at the paths of CTAN. `.state/` is the
   one reserved prefix. No CTAN root entry starts with a dot. Thus, no CTAN path starts with
   `.state/`.
-- **The page name.** `<HOST>.directory.index.html` is the one reserved file name: the page
-  that `index` makes in each directory. If an upstream file has that name, the page
+- **The page name.** `katoptra.org.directory.index.html` is the one reserved file name: the
+  page that `index` makes in each directory. If an upstream file has that name, the page
   overwrites it. Each directory also has its page at a second key, the directory with no
   trailing slash. No upstream path can be that key, because upstream is a filesystem: a name
   is a directory or a file, not the two.
@@ -60,6 +60,12 @@ the scheduler has the times of the runs.
   same as each other file. A Transform Rule rewrites `/` to it, and a second rule rewrites
   each other directory URL to the page of that directory. `README.md` is the documentation.
   katoptra adds no landing page.
+- **A directory URL serves the listing, also if the directory has an `index.html`.** The
+  CTAN instructions for mirror operators require this (`DirectoryIndex disabled`). Do not
+  set `INDEX_FILES`. `docs/reference.md` section 7 gives the cause.
+- **tlnet.katoptra.org is a second name of the bucket.** It must operate identically to
+  ctan.katoptra.org: the same status, Content-Type and bytes for each URL. The rewrites of
+  the zone rules do not use `http.host`. Thus, the two names get the same key for each URL.
 - **A failed run is the only alert.** The healthchecks.io check has a cron expression with
   the same times as the slots of the mirror, in UTC, and a grace of 3 h. The grace is
   sufficient for a run that waits for a previous run, plus a full run. The check also
