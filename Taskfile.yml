@@ -7,7 +7,7 @@
 #
 # The items in this file are for this mirror only:
 #   - the values that identify the mirror and set its limits
-#   - INDEX and PAGE_FOOT, for the directory pages
+#   - INDEX and UPSTREAM, for the directory pages
 #   - CANARY, a file that the engine reads through the domain to find the HTML rewriters
 #     of the zone
 #   - FRESH_KEY and FRESH_HOURS, for the check of the clock of the master
@@ -36,8 +36,10 @@ vars:
   # this name, the bucket keeps the page, not the file. The mirror sets no INDEX_FILES: CTAN
   # asks its mirrors to serve a listing, not an index.html, for each directory.
   INDEX: katoptra.org.directory.index.html
-  # The HTML at the end of each directory page. %s is the encoded path of the directory.
-  PAGE_FOOT: '<a href="https://ctan.org/tex-archive/%s">This directory on ctan.org</a>. Sizes in bytes, times as CTAN lists them.'
+  # UPSTREAM is the URL of this tree on ctan.org. The footer of each directory page gives it
+  # as text, with the path of the directory, and the address ctan@katoptra.org, which the
+  # engine makes from HOST.
+  UPSTREAM: https://ctan.org/tex-archive/
   # A file with 8 http:// links and 3 mailto: addresses.
   CANARY: biblio/bibtex/contrib/german/dinat/dinat-index.html
   # The master writes its clock in this file hourly. mirmon also reads the file.

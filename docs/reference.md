@@ -420,18 +420,13 @@ If upstream has the key, the daily reconcile finds that it is missing. Then the 
 run fetches it again. Do not edit the state manually to make the run fetch the key in less
 time. The risk is too large.
 
-**Make all directory pages again.**
-
-```sh
-aws s3 rm s3://ctan/.state/indexed.txt.xz
-```
-
-The next run does not find `indexed.txt.xz`, which records the state that the pages show.
-Thus, it makes the pages of all 27k directories again, at their two keys. This run is
-approximately twenty minutes long and makes 54.5k Class A operations. It is safe: the files of
-the bucket do not change. Use this method also to put a change to the markup of the page on
-the pages in the bucket. If you do not delete the file, the engine makes a page again only
-when its directory changes.
+**Make all directory pages again.** A change to `UPSTREAM`, to `HOST` or to the page format
+of lib does this at the next run. That run makes the pages of all 27k directories again, at
+their two keys. It is approximately twenty minutes long and makes 54.5k Class A operations.
+It is safe: the files of the bucket do not change. Do not delete `.state/indexed.txt.xz` to
+do this. Without that file, the run cannot find a directory that CTAN removed, and the page
+of that directory stays in the bucket. If you do not change a value, the engine makes a page
+again only when its directory changes.
 
 **A directory URL gives a 404.** The page is at its key, with or without the zone rules:
 `curl -sI https://ctan.katoptra.org/systems/knuth/katoptra.org.directory.index.html`. If

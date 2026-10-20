@@ -89,7 +89,8 @@ This mirror sets these root vars in [`Taskfile.yml`](Taskfile.yml):
   `<dir>/katoptra.org.directory.index.html` for `/dir/`, and `<dir>` for `/dir`. The mirror
   sets no `INDEX_FILES`. Thus, a directory with an `index.html` also serves the listing, as
   the CTAN instructions for mirror operators require.
-  **`PAGE_FOOT`** puts a link to the same directory on ctan.org at the end of each page.
+  The footer of each page gives the same directory on ctan.org (**`UPSTREAM`**) as text,
+  and the address ctan@katoptra.org for problem reports.
   `docs/reference.md` section 7 gives the cause of the two keys.
 - **`CANARY`** is `biblio/bibtex/contrib/german/dinat/dinat-index.html`. This HTML file has
   `http://` links (not `https://`) and `mailto:` addresses, which the HTML rewriters of the
