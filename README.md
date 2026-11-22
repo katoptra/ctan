@@ -271,4 +271,6 @@ the date of its check:
 
 Pull requests are welcome.
 
-MIT licensed. Built by [Josh Vaughen](https://ijosh.com).
+Copyright (C) 2026 Josh Vaughen. This repository is free software under the
+[GNU General Public License](LICENSE), version 3 or (at your option) any later version.
+Built by [Josh Vaughen](https://ijosh.com).
